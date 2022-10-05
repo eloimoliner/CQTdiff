@@ -1,0 +1,5 @@
+name: "maestro"
+path: "/scratch/shareddata/dldata/maestro/v3.0.0/maestro-v3.0.0"
+years: [2004,2006,2008,2009,2011, 2013, 2014, 2015] # I will use only these years as the most recent ones are sampled at 48kHz
+years_test: [ 2011, 2009,2014] #less years to make it quicker to compute, otherwise sampling is crazy long.
+      
