@@ -5,162 +5,220 @@ from decSTN_pytorch import decSTNsingle
 import scipy.signal
 import numpy as np
 
+class SamplerPhaseRetrieval(Sampler):
+
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+        assert data_consistency==False
+        assert alpha>0
+
+    def apply_mask(self, x):
+        return self.mask*x
+
+    def apply_stft(self,x):
+        win_size=self.stft_args["win_size"]
+        hop_size=self.stft_args["hop_size"]
+        window=torch.hamming_window(window_length=win_size).to(x.device)
+        x2=torch.cat((x, torch.zeros(x.shape[0],win_size ).to(x.device)),-1)
+        X=torch.stft(x2, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
+        Y_hat=torch.sqrt(X[...,0]**2 + X[...,1]**2)
+        return Y_hat
+
+    def predict_phase(
+        spec,
+        stft_args
+        ):
+        self.stft_args=stft_args
+
+        degradation=lambda x: self.apply_stft(x)
+
+        if self.rid: raise NotImplementedError
+        res=self.predict(spec, degradation)
+        return res
+class SamplerCompSens(Sampler):
+
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+        assert data_consistency==False
+        assert alpha>0
+
+    def apply_mask(self, x):
+        return self.mask*x
+
+    def predict_compsens(
+        y_masked,
+        mask
+        ):
+
+        self.mask=mask.to(y_masked.device)
+
+        degradation=lambda x: self.apply_mask(x)
+
+        if self.rid: raise NotImplementedError
+        res=self.predict(y_masked, degradation)
+        return res
+
+class SamplerDeclipping(Sampler):
+
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+        assert data_consistency==False
+        assert alpha>0
+
+    def apply_clip(self,x):
+        x_hat=torch.clip(x,min=-self.clip_value, max=self.clip_value)
+        return x_hat
+
+    def predict_declipping(
+        y_clipped,
+        clip_value
+        ):
+        self.clip_value=clip_value
+
+        degradation=lambda x: self.apply_clip(x)
+
+        if self.rid: raise NotImplementedError
+        res=self.predict(y_clipped, degradation)
+        return res
+
+class SamplerInpainting(Sampler):
+
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+
+    def apply_mask(self, x):
+        return self.mask*x
+
+    def predict_inpaintinh(
+        y_masked,
+        mask
+        ):
+        self.mask=mask.to(y_masked.device)
+
+        degradation=lambda x: self.apply_mask(x)
+
+        if self.rid: raise NotImplementedError
+        res=self.predict(y_masked, degradation)
+        return res
+
 class SamplerBWE(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, no_replace=True, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, no_replace, rid)
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
 
-    def predict_bwe():
-        return
+    def apply_FIR_filter(self,y):
+        y=y.unsqueeze(1)
+
+        #apply the filter with a convolution (it is an FIR)
+        y_lpf=torch.nn.functional.conv1d(y,self.filt,padding="same")
+        y_lpf=y_lpf.squeeze(1) 
+
+        return y_lpf
+
+    def predict_bwe(
+        ylpf,  #observations (lowpssed signal) Tensor with shape (L,)
+        filt, #filter Tensor with shape ??
+        ):
+
+        #define the degradation model as a lambda
+        self.filt=filt.to(ylpf.device)
+        degradation=lambda x: self.apply_FIR_filter(x)
+
+        if self.rid: raise NotImplementedError
+        res=self.predict(ylpf, degradation)
+        return res
         
 class Sampler():
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, no_replace=True, rid=False):
+    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+
         self.model = model
         self.diff_params = diff_params
         self.alpha=alpha #hyperparameter for the reconstruction guidance
         self.order=order
-        self.no_replace=no_replace #use reconstruction gudance without replacement
+        self.no_replace=not(data_consistency) #use reconstruction gudance without replacement
         self.args=args
         self.nb_steps=self.args.inference.T
-        #self.alpha=1 #hyparparameter, 1 equals Heun 2nd order, differnt values can be chosen empirically. They say 1.1 works better
 
-        ##self.use_treshold_on_grads=args.inference.max_thresh_grads!=0
         self.treshold_on_grads=args.inference.max_thresh_grads
-        self.use_dynamic_thresh=args.inference.use_dynamic_thresh
-        self.dyn_thresh_percentile=args.inference.dynamic_thresh_percentile
         self.rid=rid
 
-    def apply_filter(self,y,filter):
-        #ii=1
-        y=y.unsqueeze(1)
-        #weight=torch.nn.Parameter(B)
-        y_lpf=torch.nn.functional.conv1d(y,filter,padding="same")
-        y_lpf=y_lpf.squeeze(1) #some redundancy here, but its ok
-        #y_lpf=y
-        return y_lpf
 
-    def apply_smask(self,x, M):
-        
-        L=x.shape[-1]
-        #careful, these parameters should match how the mask is generated
-        nWin1=self.args.STN.nwin
-        nHop1 = nWin1*7//8
-        win1 = torch.hann_window(nWin1, periodic=True).to(x.device)
-        #first do an STFT
-        X = torch.stft(x, nWin1, hop_length=nWin1-nHop1, win_length=nWin1, window=win1,center=True, onesided=True, return_complex=True, normalized=False)
-        #mask in the STFT domain and inverse-transform
-        out = torch.istft(M*X, nWin1, hop_length=nWin1-nHop1, win_length=nWin1, window=win1, center=True, onesided=True, normalized=False)
+    def data_consistency_step(self, x_hat, y, degradation):
+        #get reconstruction estimate
+        den_rec= degradation(x_hat)     
+        #apply replacment (valid for linear degradations)
+        return y+x_hat-den_rec 
 
-        return out
+    def get_score_rec_guidance(self, x, y, t_i, degradation)
 
-    def apply_tmask(self,x,M):
-        #will the shapes be ok??
-        return M*x
-
-    def denoising_step(
-        self,
-        x, #Noisy input
-        y, #observations, lpfed signal
-        t_i, #timestep
-        filt, #lowpass filter
-        Mt=None #temporal mask
-    ):
-        #do the basic denoising
-        with torch.no_grad():
-            denoised=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
-                
-            den_filtered= self.apply_filter(denoised,filt) 
-            den_rec=den_filtered
-           
-            if Mt != None:
-                den_t_masked=self.apply_tmask(denoised, Mt)
-                den_rec+= den_t_masked - self.apply_tmask(den_rec, Mt)
-
-            denoised2=y+denoised-den_rec 
-
-        return denoised2 
-
-    def denoising_step_rg(
-        self,
-        x, #Noisy input
-        y, #all of the observations
-        t_i, #timestep
-        filt, #lpf
-        Mt=None #temporal mask
-    ):
-        #do the denoising step with reconstruction guidance
         x.requires_grad_()
-        denoised=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
-        
-        #apply rec. guidance
-        #check if Mt or S are given to know what to do
-        
-        den_filtered= self.apply_filter(denoised,filt) 
-        den_rec=den_filtered
+        x_hat=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
+        den_rec= degradation(x_hat) 
 
-        if Mt != None:
-            den_t_masked=self.apply_tmask(denoised, Mt)
-            den_rec+= den_t_masked - self.apply_tmask(den_rec, Mt)
-        
-
-        #norm=torch.sum((y-den_rec)**2)
         norm=torch.linalg.norm(y-den_rec, ord=2)
-    
+        
         rec_grads=torch.autograd.grad(outputs=norm,
                                       inputs=x)
-        #print(rec_grads)
-        x.detach_()
+
         rec_grads=rec_grads[0]
-
-        score=(denoised.detach()-x)/t_i**2
-
-        normscore=torch.linalg.norm(score)
-        #normguide=torch.linalg.norm(rec_grads)
-        normguide=torch.linalg.norm(rec_grads)/self.args.audio_len**0.5
-        #s=self.alpha*normscore/(normguide+1e-5)
-        s=self.alpha/(normguide*t_i+1e-6)
-        #print(normscore, normguide, s)
-        #s=self.alph
-
-        #if self.use_dynamic_thresh:
-        #    #assert self.treshold_on_grads>0
-                
-            
-        #    tresh = torch.quantile(
-        #    rec_grads.abs(),
-        #    self.dyn_thresh_percentile,
-        #    dim = -1
-        #    )
-        #    print("tresh",tresh, "max_grad",torch.max(torch.abs(rec_grads)))
         
-        #    rec_grads=torch.clip(rec_grads,min=-tresh, max=tresh) 
+        normguide=torch.linalg.norm(rec_grads)/self.args.audio_len**0.5
+        
+        #normalize scaling
+        s=self.alpha/(normguide*t_i+1e-6)
+        
+        #optionally apply a treshold to the gradients
+        if self.treshold_on_grads>0:
+            #pply tresholding to the gradients. It is a dirty trick but helps avoiding bad artifacts 
+            rec_grads=torch.clip(rec_grads, min=-self.treshold_on_grads, max=self.treshold_on_grads)
+        
 
-            #rec_grads=torch.clip(rec_grads, min=-self.treshold_on_grads, max=self.treshold_on_grads)
+        score=(x_hat.detach()-x)/t_i**2
 
-        rec_grads=s*rec_grads 
+        #apply scaled guidance to the score
+        score=score-s*rec_grads
 
-        return score.detach(), rec_grads
+        return score
 
+    def get_score(self,x. y, t_i, degradation):
+        if y==None:
+            assert degragation==None:
+            #unconditional sampling
+            x_hat=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
+            score=(x_hat-x)/t_i**2
+            return score
+        else:
+            if self.alpha>0:
+                #apply rec. guidance
+                score=self.get_score_rec_guidance(x, y, t_i, degradation)
+    
+                #optionally apply replacement or consistency step
+                if not(self.no_replace):
+                    #convert score to denoised estimate using Tweedie's formula
+                    x_hat=score*t_i**2+x
+    
+                    x_hat=self.data_consistency_step(x_hat,y, degradation)
+    
+                    #convert back to score
+                    score=(x_hat-x)/t_i**2
+    
+            else:
+                #denoised with replacement method
+                with torch.no_grad():
+                    x_hat=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
+                        
+                    x_hat=self.data_consistency_step(x_hat,y, degradation)
+        
+                    score=(x_hat-x)/t_i**2
+    
+            return score
 
-
-
-    def predict_bwe(
+    def predict_unconditional(
         self,
-        ylpf,  #observations (lowpssed signal) Tensor with shape ??
-        filt, #filter Tensor with shape ??
-        yt=None, #obervations from previous segment
-        Mt=None #temporal mask for yt
+        shape,  #observations (lowpssed signal) Tensor with shape ??
+        device
     ):
-        #predict a sample conditioned from some observations 
-
-        #if an extra conditioning observation is given, assert the mask or filter is alo given
-        assert (yt is None) == (Mt is None)
-        if Mt!=None:
-            raise NotImplementedError
-
-        device=ylpf.device
-        shape=ylpf.shape
 
         if self.rid:
             data_denoised=torch.zeros((self.nb_steps,shape[0], shape[1]))
@@ -173,12 +231,6 @@ class Sampler():
         #parameter for langevin stochasticity, if Schurn is 0, gamma will be 0 to, so the sampler will be deterministic
         gamma=self.diff_params.get_gamma(t).to(device)
 
-        #put the conditions together
-        y=ylpf #y vector will contain all the conditioning signals 
-
-        if yt!=None:
-            #add conciously the temporal conditioning
-            y+= yt- self.apply_tmask(y, Mt)
 
         for i in tqdm(range(0, self.nb_steps, 1)):
             #print("sampling step ",i," from ",self.nb_steps)
@@ -196,28 +248,11 @@ class Sampler():
                 #add extra noise
                 x_hat=x+((t_hat**2 - t[i]**2)**(1/2))*epsilon 
 
-            if self.alpha>0:
-                #denoise with reconstruction guidance
-                #S or Mt will probably be None, this function will take care of that
-                score, guide=self.denoising_step_rg(x_hat,y,t_hat, filt, Mt)
-                score=score-guide
-
-                #replacement or consistency
-                if not(self.no_replace):
-                    den=score*t_hat**2+x_hat
-                    den2=y+den-self.apply_filter(den,filt)
-                    score=(den2-x_hat)/t_hat**2
-
-            else:
-                #denoised with replacement method
-                #S or Mt will probably be None, this function will take care of that
-                denoised=self.denoising_step(x_hat,y,t_hat,filt, Mt)
-                score=(denoised-x_hat)/t_hat**2
+            score=self.get_score(x_hat, None, t_hat, None)    
 
             #d=-t_hat*((denoised-x_hat)/t_hat**2)
             d=-t_hat*score
             
-
             #apply second order correction
             h=t[i+1]-t_hat
 
@@ -228,25 +263,75 @@ class Sampler():
                 #h=t[i+1]-t_hat
                 t_prime=t[i+1]
                 x_prime=x_hat+h*d
+                score=self.get_score(x_prime, None, t_prime, None)
 
-                if self.alpha>0:
-                    #denoise with reconstruction guidance
-                    #S or Mt will probably be None, this function will take care of that
-                    #denoised=self.denoising_step_rg(x_prime,y,t_prime, filt, Mt)
-                    score, guide=self.denoising_step_rg(x_prime,y,t_prime, filt, Mt)
-                    score=score-guide
-                    #replacement or consistency
-                    if not(self.no_replace):
-                        den=score*t_prime**2+x_prime
-                        den2=y+den-self.apply_filter(den,filt)
-                        score=(den2-x_prime)/t_prime**2
-                else:
-                    #denoised with replacement method
-                    #S or Mt will probably be None, this function will take care of that
-                    denoised=self.denoising_step(x_prime,y,t_prime,filt, Mt)
-                    score=(denoised-x_prime)/t_prime**2
+                d_prime=-t_prime*score
 
-                #d_prime=-t_prime*((denoised-x_prime)/t_prime**2)
+                x=(x_hat+h*((1/2)*d +(1/2)*d_prime))
+
+            elif t[i+1]==0 or self.order==1: #first condition  is to avoid dividing by 0
+                #first order Euler step
+                x=x_hat+h*d
+            
+        if self.rid:
+            return x.detach(), data_denoised.detach(), t.detach()
+        else:
+            return x.detach()
+
+    def predict(
+        self,
+        y,  #observations (lowpssed signal) Tensor with shape ??
+        degradation, #lambda function
+    ):
+
+        device=y.device
+        shape=y.shape
+
+        if self.rid:
+            data_denoised=torch.zeros((self.nb_steps,shape[0], shape[1]))
+
+        #get the noise schedule
+        t = self.diff_params.create_schedule(self.nb_steps).to(device)
+        #sample from gaussian distribution with sigma_max variance
+        x = self.diff_params.sample_prior(shape,t[0]).to(device)
+
+        #parameter for langevin stochasticity, if Schurn is 0, gamma will be 0 to, so the sampler will be deterministic
+        gamma=self.diff_params.get_gamma(t).to(device)
+
+
+        for i in tqdm(range(0, self.nb_steps, 1)):
+            #print("sampling step ",i," from ",self.nb_steps)
+
+            if gamma[i]==0:
+                #deterministic sampling, do nothing
+                t_hat=t[i] 
+                x_hat=x
+            else:
+                #stochastic sampling
+                #move timestep
+                t_hat=t[i]+gamma[i]*t[i] 
+                #sample noise, Snoise is 1 by default
+                epsilon=torch.randn(shape).to(device)*self.diff_params.Snoise
+                #add extra noise
+                x_hat=x+((t_hat**2 - t[i]**2)**(1/2))*epsilon 
+
+            score=self.get_score(x_hat, y, t_hat, degradation)    
+
+            #d=-t_hat*((denoised-x_hat)/t_hat**2)
+            d=-t_hat*score
+            
+            #apply second order correction
+            h=t[i+1]-t_hat
+
+            if self.rid: data_denoised[i]=score*t_hat**2+x_hat
+
+            if t[i+1]!=0 and self.order==2:  #always except last step
+                #second order correction2
+                #h=t[i+1]-t_hat
+                t_prime=t[i+1]
+                x_prime=x_hat+h*d
+                score=self.get_score(x_prime, y, t_prime, degradation)
+
                 d_prime=-t_prime*score
 
                 x=(x_hat+h*((1/2)*d +(1/2)*d_prime))
