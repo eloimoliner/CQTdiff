@@ -35,6 +35,7 @@ class SamplerPhaseRetrieval(Sampler):
         if self.rid: raise NotImplementedError
         res=self.predict(spec, degradation)
         return res
+
 class SamplerCompSens(Sampler):
 
     def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
