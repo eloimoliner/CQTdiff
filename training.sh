@@ -16,15 +16,20 @@ export TORCH_USE_RTLD_GLOBAL=YES
 #export HYDRA_FULL_ERROR=1
 #export CUDA_LAUNCH_BLOCKING=1
 
-n=$SLURM_ARRAY_TASK_ID
+n=1
 #n=133
 
 namerun=bwe_with_fixed_noise
 name="${n}_$namerun"
 iteration=`sed -n "${n} p" iteration_parameters.txt`
 #
-PATH_EXPERIMENT=experiments/${n}
+PATH_EXPERIMENT=experiments/cqt
 mkdir $PATH_EXPERIMENT
 
 #python train_w_cqt.py path_experiment="$PATH_EXPERIMENT"  $iteration
-python train.py model_dir="$PATH_EXPERIMENT" $iteration  wandb.run_name=$name restore=True lr=2e-4 
+python train.py model_dir="$PATH_EXPERIMENT" $iteration \
+                 wandb.run_name=$name \
+                 restore=True \
+                 lr=2e-4 \
+                diffusion_parameters.Schurn=0
+                

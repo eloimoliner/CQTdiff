@@ -6,8 +6,9 @@ import torch
 #import torchaudio
 torch.pi = torch.acos(torch.zeros(1)).item() * 2 # which is 3.1415927410125732
 
-import utils
+from src.CQT_nsgt import CQT_cpx
 import torchaudio
+import src.utils.logging as utils_logging
 class CombinerUp(nn.Module):
 
     def __init__(self,mode, Npyr, Nx, bias=True):
@@ -457,10 +458,10 @@ class ResnetBlock(nn.Module):
 
         return (y + self.res_conv(x))/(2**0.5)
 
-class Unet2d(nn.Module):
+class Unet_CQT(nn.Module):
 
     def __init__(self, args, device):
-        super(Unet2d, self).__init__()
+        super(Unet_CQT, self).__init__()
         self.args=args
         self.depth=6
         self.embedding = RFF_MLP_Block()
@@ -470,7 +471,7 @@ class Unet2d(nn.Module):
         self.fmin=fmax/(2**self.args.cqt.numocts)
         self.fbins=int(self.args.cqt.binsoct*self.args.cqt.numocts) 
         self.device=device
-        self.CQTransform=utils.CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, self.args.audio_len, device=self.device, split_0_nyq=False)
+        self.CQTransform=CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, self.args.audio_len, device=self.device, split_0_nyq=False)
         Nin=2
 
         #self.f_dim=self.args.stft.win_size//2 +1
@@ -558,7 +559,7 @@ class Unet2d(nn.Module):
 
 
     def setup_CQT_len(self, len):
-        self.CQTransform=utils.CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, len, device=self.device, split_0_nyq=False)
+        self.CQTransform=CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, len, device=self.device, split_0_nyq=False)
 
     def forward(self, inputs, sigma):
         sigma = self.embedding(sigma)
@@ -638,26 +639,6 @@ class Unet2d(nn.Module):
         assert pred_time.shape==inputs.shape, "bad shapes"
         return pred_time
 
-    def do_stft(self,x):
-        win_size=self.args.stft.win_size
-        hop_size=self.args.stft.hop_size
-        window=torch.hamming_window(window_length=self.args.stft.win_size)
-        window=window.to(x.device)
-        x=torch.cat((x, torch.zeros(x.shape[0],win_size).to(x.device)),1)
-        stft_signal_noisy=torch.stft(x, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
-        stft_signal_noisy=stft_signal_noisy.permute(0,2,1,3)
-       
-        return stft_signal_noisy.unsqueeze(1)
-
-    def do_istft(self,x):
-        x=x.squeeze(1)
-        win_size=self.args.stft.win_size
-        hop_size=self.args.stft.hop_size
-        window=torch.hamming_window(window_length=win_size) #this is slow! consider optimizing
-        window=window.to(x.device)
-        x=x.permute(0,2,1,3)
-        pred_time=torch.istft(x, win_size, hop_length=hop_size,  window=window, center=False, return_complex=False)
-        return pred_time
             
 
 class CropAddBlock(nn.Module):

@@ -1,39 +1,24 @@
 defaults:
-  - dset: pianos
+  - dset: maestro
 
 wandb:
   entity: "eloimoliner"
   project: "diffusion_june_2022"
   run_name: "unnamed"
 
-model_dir: "experiments/1"
+model_dir: "experiments/cqt"
 
-architecture: "unet_STFT" #"unet"
+architecture: "unet_CQT" #"unet"
 
 sample_rate: 22050
 audio_len: 65536
-resample_factor: 1
-
-use_margin: False
-margin_size: 0.25
+resample_factor: 2
 
 
 #training functionality parameters
 num_workers: 4 #useful to speed up the dataloader
 device: "cpu" #it will be updated in the code, no worries
 
-
-wavenet:
-  unconditional: false
-  in_channels: 1
-  out_channels: 1
-  diffusion_step_embed_dim_in: 128
-  diffusion_step_embed_dim_mid: 512
-  diffusion_step_embed_dim_out: 512
-  res_channels: 128
-  skip_channels: 256
-  num_res_layers: 30
-  dilation_cycle: 10
 
 sashimi:
   unconditional: False
@@ -50,42 +35,9 @@ sashimi:
   ff: 2
   L: ${audio_len} # Truncates infinite kernel to length of training inputs
 
-nuwave2:
-  arch: 
-    residual_layers: 15 #
-    residual_channels: 64
-    pos_emb_dim: 512
-    bsft_channels: 64
-  dpm:
-    max_step: 1000
-    pos_emb_scale: 50000
-    pos_emb_channels: 128
-    infer_step: 8
-    infer_schedule: "torch.tensor([-2.6, -0.8, 2.0, 6.4, 9.8, 12.9, 14.4, 17.2])"
-  audio:
-    filter_length: 1024
-    hop_length: 256
-    win_length: 1024
-    sr_min: 1500
-    sr_max: 16000
-
-
   
 
 #pre-emph
-normalization:
-  normalize_by_sigma_data: False
-  use_mu_law: False
-  mu: 255
-  apply_pre_emph: False
-  bcoeffs: [1, -0.95] #first order HPF, hand-crafted
-
-pre_emph:
-  use_pre_emph: False
-  type: "high-pass"
-  bcoeffs: [1, -0.85] #use these coeffs if fs=44.1
-  compensation_gain: 10
-
 stft:
   win_size: 1024
   hop_size: 256
@@ -100,33 +52,6 @@ cqt:
   fmin: 150 #no worries, not used
   use_norm: True
 
-
-STN:
-  use_STN: False
-  nwin: 4096
-  mode: "stn" #"stn" train two models in parallel, "s" train only sines model, "tn" train only noisy model
-  progressive: False #idea of progressively incrementing the "interference" part
-  model_s_architecture: "unet_stft"
-  model_tn_architecture: "unet1d_conditional"
-  model_s_checkpoint: None
-  model_tn_checkpoint: None
-  model_s_dir: None
-  model_tn_dir: None
-  conditioning: None    #"melspec" #only for tn mode, indicates how the model is conditioned to the tonal part
-  sigma_z: None
-  sigma_data_s: 0.025
-  sigma_data_tn: 4e-3
-  melspec:
-    valid: false
-    filter_length: 1024
-    hop_length: 256
-    win_length: 1024
-    mel_fmin: 0.0
-    mel_fmax: 8000.0
-    n_mels: 80
-
-
-
 unet:
 ## Model params
   padding: "zeros" #or "circular" or others see nn.Convd1 documentation
@@ -135,7 +60,6 @@ unet:
   use_gru: True
   conditioner:
    use_conditioning: True
-     
   
 save_model: False
 
@@ -151,9 +75,8 @@ lr: 2e-4 #used
 #schedule_sampler: "uniform"
 #weight_decay: 0.0
 #lr_anneal_steps: 0
-batch_size: 16
+batch_size: 4
 
-microbatches: 1  # -1 disables microbatches
 #ema_rate: "0.9999"  # comma-separated list of EMA values
 ema_rate: 0.9999  
 
@@ -164,8 +87,6 @@ scheduler_gamma: 0.8
 restore : False
 checkpoint_id: None
 
-
-
 #logging params
 log_interval: 10
 save_interval: 100
@@ -174,93 +95,69 @@ save_interval: 100
 n_bins: 20
 #
 #
-sample_examples:
-  num_examples: 2048
-  path: "sample_examples_for_metrics/youtubemix_train_3s"
-#
-#
-aliasfree:
-  fh: 0.41   #non-critical sampling factor
 
 inference:
-  audio: None
+  mode: "unconditional" #"inpainting", "bandwidth_extension" ,"declipping", "phase_retrieval", "comp_sens", "melspec_inversion"
+  load:
+    load_mode: "single_example" # "maestro_test" or "from_directory"
+    audio: None
+    data_directory: None
+    seg_size: None
+    seg_idx: None
   checkpoint:  "weights-200000.pt"
   exp_name: "testing"
-  T: 75 #number of discretizatio steprs
+  T: 35 #number of discretizatio steprs
   num_sample_chunks: 1
-  num_samples: 8
-  stereo: False #notimplemented
+  unconditional:
+    num_samples: 1
   alpha: 0 #restoration guidance, 0 means no guidance
-  no_replace: True
+  data_consistency: False
   sampler: "deterministic" #wether deterministic or stochastic
   noise_in_observations: 0
-  filter:
-    type: "firwin" #or "cheby1_fir"
-    fc: 1000 #cutoff frequency of the applied lpf
-    order: 200
-    fir_order: 600
-    beta: 1
-    ripple: 0.05 #for the cheby1
+  bandwidth_extension:
+    filter:
+      type: "firwin" #or "cheby1_fir"
+      fc: 1000 #cutoff frequency of the applied lpf
+      order: 200
+      fir_order: 600
+      beta: 1
+      ripple: 0.05 #for the cheby1
   inpainting:
     gap_length: 1500 #in ms
+    start_gap_idx: None #in ms, None means at the middle
   comp_sens: 
     percentage: 5 #%
-  long_sampling:
-    use_autoregressive: False
-    overlap: 0.25
-    discard_samples: 512
+  phase_retrieval:
+    win_size: 1024
+    hop_size: 256
   max_thresh_grads: 1
-  use_dynamic_thresh: False
-  dynamic_thresh_percentile: 0.95
   type_spec: "linear" #or "mel" for phase retrieval
   declipping:
-    clip_value: 0.1
     SDR: 3 #in dB
 
 extra_info: "no extra info" 
 
-sde_type: 'vp-cos'
+sde_type: 'VE_elucidating'
 
 diffusion_parameters:
-  sigma_data: 1
-  sigma_min: 2e-5
-  sigma_max: 1
-  P_mean: -1.2
-  P_std: 1.2
+  sigma_data: 0.057 #default for maestro
+  sigma_min: 1e-6
+  sigma_max: 10
+  P_mean: -1.2 #what is this for?
+  P_std: 1.2 #ehat is this for?
   ro: 10
   ro_train: 10
-  Schurn: 0
+  Schurn: 5
   Snoise: 1
   Stmin: 0
   Stmax: 50
  
-  
 sde_kwargs:
   gamma: None
   eta: None
   sigma_min: 1e-4
   sigma_max: 0.999
 
-bwe:
-  num_random_filters: 1000
-  lpf:
-     mean_fc: 3000
-     std_fc: 900
-  conditional: False
-  num_recordings_test: 9
-  sigma_z: 1e-3
-  fixed_noise: False
-
-augmentations:
-  rev_polarity: False
-  pitch_shift:
-    use: False
-    min_semitones: -6
-    max_semitones: 6
-  gain:
-    use: False
-    min_db: -3
-    max_db: 3
      
 hydra:
   job:

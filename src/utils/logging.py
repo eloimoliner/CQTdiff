@@ -1,15 +1,51 @@
+import os
 import torch 
 import time
 import numpy as np
 import cv2
 import torchaudio
-import utils
+import src.utils as utils
 import matplotlib.pyplot as plt
 import plotly.express as px
 import soundfile as sf
 import plotly.graph_objects as go
 import pandas as pd
 import plotly
+
+from src.CQT_nsgt import CQT_cpx
+def do_stft(noisy, clean=None, win_size=2048, hop_size=512, device="cpu", DC=True):
+    
+    #window_fn = tf.signal.hamming_window
+
+    #win_size=args.stft.win_size
+    #hop_size=args.stft.hop_size
+    window=torch.hamming_window(window_length=win_size)
+    window=window.to(noisy.device)
+    noisy=torch.cat((noisy, torch.zeros(noisy.shape[0],win_size).to(noisy.device)),1)
+    stft_signal_noisy=torch.stft(noisy, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
+    stft_signal_noisy=stft_signal_noisy.permute(0,3,2,1)
+    #stft_signal_noisy=tf.signal.stft(noisy,frame_length=win_size, window_fn=window_fn, frame_step=hop_size)
+    #stft_noisy_stacked=tf.stack( values=[tf.math.real(stft_signal_noisy), tf.math.imag(stft_signal_noisy)], axis=-1)
+    
+    if clean!=None:
+
+       # stft_signal_clean=tf.signal.stft(clean,frame_length=win_size, window_fn=window_fn, frame_step=hop_size)
+        clean=torch.cat((clean, torch.zeros(clean.shape[0],win_size).to(device)),1)
+        stft_signal_clean=torch.stft(clean, win_size, hop_length=hop_size,window=window, center=False,return_complex=False)
+        stft_signal_clean=stft_signal_clean.permute(0,3,2,1)
+        #stft_clean_stacked=tf.stack( values=[tf.math.real(stft_signal_clean), tf.math.imag(stft_signal_clean)], axis=-1)
+
+
+        if DC:
+            return stft_signal_noisy, stft_signal_clean
+        else:
+            return stft_signal_noisy[...,1:], stft_signal_clean[...,1:]
+    else:
+
+        if DC:
+            return stft_signal_noisy
+        else:
+            return stft_signal_noisy[...,1:]
 
 def plot_norms(path, normsscores, normsguides, t, name):
     values=t.cpu().numpy()
@@ -161,6 +197,12 @@ def plot_cpxspectrogram(X):
     fig.update_layout(coloraxis_showscale=False)
 
     return fig
+def print_cuda_memory():
+    t = torch.cuda.get_device_properties(0).total_memory
+    r = torch.cuda.memory_reserved(0)
+    a = torch.cuda.memory_allocated(0)
+    f = r-a  # free inside reservedk
+    print("memrylog",t,r,a,f)
 
 def plot_mag_spectrogram(X, refr=None, path=None,name="spec"):
     #X=X.squeeze(1)
@@ -214,14 +256,17 @@ def plot_spectrogram(X, refr=None):
 
     return fig
 
-def write_audio_file(x,sr):
-    path="/scratch/work/molinee2/tmp/tmp_audio_example.wav"
+def write_audio_file(x, sr, string: str, path='tmp_audio/'):
+    path=path+string+".wav"
     x=x.flatten()
     x=x.unsqueeze(1)
     x=x.cpu().numpy()
-    
+    if np.abs(np.max(x))>=1:
+        #normalize to avoid clipping
+        x=x/np.abs(np.max(x))
     sf.write(path,x,sr)
     return path
+
 
 def plot_cpxCQT_from_raw_audio(x, args, refr=None ):
     #shape of input spectrogram:  (     ,T,F, )
@@ -229,7 +274,7 @@ def plot_cpxCQT_from_raw_audio(x, args, refr=None ):
     fmin=fmax/(2**args.cqt.numocts)
     fbins=int(args.cqt.binsoct*args.cqt.numocts) 
     device=x.device
-    CQTransform=utils.CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
+    CQTransform=CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
 
     x=x
     X=CQTransform.fwd(x)
@@ -241,7 +286,7 @@ def plot_CQT_from_raw_audio(x, args, refr=None ):
     fmin=fmax/(2**args.cqt.numocts)
     fbins=int(args.cqt.binsoct*args.cqt.numocts) 
     device=x.device
-    CQTransform=utils.CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
+    CQTransform=CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
 
     refr=3
     x=x
@@ -249,7 +294,7 @@ def plot_CQT_from_raw_audio(x, args, refr=None ):
     return plot_spectrogram(X, refr)
 
 def get_spectrogram_from_raw_audio(x, stft, refr=1):
-    X=utils.do_stft(x, win_size=stft.win_size, hop_size=stft.hop_size)
+    X=do_stft(x, win_size=stft.win_size, hop_size=stft.hop_size)
     X=X.permute(0,2,3,1)
 
     X=X.squeeze(1)
@@ -286,7 +331,7 @@ def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion
     fmax=args.sample_rate/2
     fmin=fmax/(2**args.cqt.numocts)
     fbins=int(args.cqt.binsoct*args.cqt.numocts) 
-    CQTransform=utils.CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
+    CQTransform=CQT_cpx(fmin,fbins, args.sample_rate, args.audio_len, device=device, split_0_nyq=False)
 
     for i in tt:
         i=int(torch.floor(i))
@@ -334,7 +379,6 @@ def diffusion_spec_animation(path, x ,t,  stft, refr=1, name="animation_diffusio
     allX=None
     for i in tt:
         i=int(torch.floor(i))
-        print(i)
         i_s.append(i)
         X=get_spectrogram_from_raw_audio(x[i],stft, refr)
         X=X.unsqueeze(0)
@@ -343,8 +387,6 @@ def diffusion_spec_animation(path, x ,t,  stft, refr=1, name="animation_diffusio
         else:
              allX=torch.cat((allX,X), 0)
 
-        
-        print(allX.shape)
       
     allX=allX.cpu().numpy()
     fig=px.imshow(allX, animation_frame=0,  zmin=-40, zmax=20) #I need to incorporate t here!!!
@@ -371,7 +413,7 @@ def plot_spectrogram_from_raw_audio(x, stft, refr=None ):
     #shape of input spectrogram:  (     ,T,F, )
     refr=3
     x=x
-    X=utils.do_stft(x, win_size=stft.win_size, hop_size=stft.hop_size)
+    X=do_stft(x, win_size=stft.win_size, hop_size=stft.hop_size)
     X=X.permute(0,2,3,1)
     return plot_spectrogram(X, refr)
 

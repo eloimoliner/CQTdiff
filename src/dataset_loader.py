@@ -143,6 +143,79 @@ class TestDataset_fullpiece(torch.utils.data.Dataset):
         else:
             return self.data_clean_loaded[idx]
 
+class TestDataset_chunks(torch.utils.data.Dataset):
+
+    def __init__(self, dset_args, fs=44100, seg_len=131072, idx=0, return_name=False):
+
+        self.return_name=return_name
+        path=dset_args.path
+        years=dset_args.years_test
+
+        metadata_file=os.path.join(path,"maestro-v3.0.0.csv")
+        metadata=pd.read_csv(metadata_file)
+
+        metadata=metadata[metadata["year"].isin(years)]
+        metadata=metadata[metadata["split"]=="test"]
+
+        filelist=metadata["audio_filename"]
+
+        filelist=filelist.map(lambda x:  os.path.join(path,x), na_action='ignore')
+
+        val_samples=filelist.to_list()
+
+        print("Loading clean files")
+        data_clean_loaded=[]
+        if return_name: self.filenames=[]
+        for ff in tqdm(range(0,len(val_samples))):  
+
+            if return_name:
+                name=os.path.normpath(val_samples[ff]).split(os.path.sep)
+                self.filenames.append(name[-1])
+
+            data_clean, samplerate = sf.read(val_samples[ff])
+            if samplerate!=fs: 
+                print(samplerate, fs)
+                print("!!!!WRONG SAMPLE RATe!!!")
+            #Stereo to mono
+            if len(data_clean.shape)>1 :
+                data_clean=np.mean(data_clean,axis=1)
+            #normalize
+            #data_clean=data_clean/np.max(np.abs(data_clean))
+            data_clean_loaded.append(data_clean)
+            del data_clean
+    
+        #framify data clean files
+        print("Framifying clean files")
+        seg_len=int(seg_len)
+        self.segments_clean=[]
+        for file in tqdm(data_clean_loaded):
+            #print(file) 
+            #framify  arguments: seg_len, hop_size
+            hop_size=int(seg_len)# no overlap
+    
+            num_frames=np.floor(len(file)/hop_size - seg_len/hop_size +1) 
+            
+            pointer=idx*fs
+            #print(i, num_frames)
+            segment=file[pointer:pointer+int(seg_len)]
+            segment=segment.astype('float32')
+
+            self.segments_clean.append(segment)
+    
+        del data_clean_loaded
+        
+        #scales=np.random.uniform(-6,4,len(self.segments_clean))
+
+    def __len__(self):
+        #print(len(self.segments_clean))
+        return len(self.segments_clean)
+
+    def __getitem__(self, idx):
+        if self.return_name:
+            return self.segments_clean[idx], self.filenames[idx]
+        else:
+            return self.segments_clean[idx]
+
 class TestDataset(torch.utils.data.Dataset):
 
     def __init__(self, dset_args, fs=44100, seg_len=131072):

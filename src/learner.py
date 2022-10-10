@@ -9,25 +9,56 @@ from tqdm import tqdm
 from glob import glob
 
 #from dataset import from_path as dataset_from_path
-from getters import get_sde
 import time
-from inference import Deterministic_Sampling_Elucidating, Stochastic_Sampling_Elucidating
-import utils
-import utils_plotting
-import lowpass_utils
+from src.sampler import Sampler
+import src.utils.logging as utils_logging
 import wandb
 
-from sde import  VE_Sde_Elucidating
+from src.sde import  VE_Sde_Elucidating
 
 
 class Learner:
+    """The summary line for a class docstring should fit on one line.
+
+    If the class has public attributes, they may be documented here
+    in an ``Attributes`` section and follow the same formatting as a
+    function's ``Args`` section. Alternatively, attributes may be documented
+    inline with the attribute's declaration (see __init__ method below).
+
+    Properties created with the ``@property`` decorator should be documented
+    in the property's getter method.
+
+    Attributes:
+        attr1 (str): Description of `attr1`.
+        attr2 (:obj:`int`, optional): Description of `attr2`.
+
+    """
     def __init__(
         self, model_dir, model, train_set,  optimizer, args, log=True
     ):
+        """Example of docstring on the __init__ method.
+
+        The __init__ method may be documented in either the class level
+        docstring, or as a docstring on the __init__ method itself.
+
+        Either form is acceptable, but the two should not be mixed. Choose one
+        convention to document the __init__ method and be consistent with it.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1 (str): Description of `param1`.
+            param2 (:obj:`int`, optional): Description of `param2`. Multiple
+                lines are supported.
+            param3 (:obj:`list` of :obj:`str`): Description of `param3`.
+
+        """
         os.makedirs(model_dir, exist_ok=True)
         self.model_dir = model_dir
         self.model = model
         self.step = 0
+        self.device=next(self.model.parameters()).device
         if args.restore:
             self.restore_from_checkpoint()
 
@@ -39,13 +70,12 @@ class Learner:
         else:
             raise NotImplementedError
 
-        self.det_sampler=Deterministic_Sampling_Elucidating(self.model,self.diff_parameters)
-        self.stoch_sampler=Stochastic_Sampling_Elucidating(self.model,self.diff_parameters)
+        self.args = args
+        self.sampler=Sampler(self.model,self.diff_parameters, self.args, alpha=self.args.inference.alpha, data_consistency=self.args.inference.data_consistency, rid=False) #am I misising parameters
 
         self.ema_rate = args.ema_rate
         self.train_set = train_set
         self.optimizer = optimizer
-        self.args = args
         self.scheduler = torch.optim.lr_scheduler.StepLR(
             self.optimizer, step_size=self.args.scheduler_step_size, gamma=self.args.scheduler_gamma)
 
@@ -61,7 +91,6 @@ class Learner:
 
 
         self.cum_grad_norms = 0
-        self.device=next(self.model.parameters()).device
         #self.filters=lowpass_utils.get_random_FIR_filters(self.args.bwe.num_random_filters, mean_fc=self.args.bwe.lpf.mean_fc, std_fc=self.args.bwe.lpf.std_fc, device=self.device,sr=self.args.sample_rate)# more parameters here
         self.log=log
         if self.log:
@@ -73,7 +102,6 @@ class Learner:
                   "audio_len": self.args.audio_len,
                   "sample_rate": self.args.sample_rate,
                   "batch_size": self.args.batch_size,
-                  "microbatches": self.args.microbatches,
                   "dataset": self.args.dset.name,
                   "sde_type": self.args.sde_type,
                   "architecure": self.args.architecture,
@@ -140,21 +168,34 @@ class Learner:
                 checkpoint_id = max(list_ids)
 
             checkpoint = torch.load(
-                f"{self.model_dir}/weights-{checkpoint_id}.pt")
+                f"{self.model_dir}/weights-{checkpoint_id}.pt", map_location=self.device)
             self.load_state_dict(checkpoint)
             return True
         except (FileNotFoundError, ValueError):
             return False
 
-    def sample(self, num_samples):
-        shape=(num_samples, self.args.audio_len)
+    def sample(self):
+        shape=(self.args.inference.unconditional.num_samples, self.args.audio_len)
 
-        res_det=self.det_sampler.predict(shape,35, self.device)
+        res=self.sampler.predict_unconditional(shape, self.device)
 
-        self._write_summary_sample(res_det, "deterministic")
+        self._write_summary_sample(res, "unconditional")
 
 
     def train(self):
+        """Class methods are similar to regular functions.
+
+        Note:
+            Do not include the `self` parameter in the ``Args`` section.
+
+        Args:
+            param1: The first parameter.
+            param2: The second parameter.
+
+        Returns:
+            True if successful, False otherwise.
+
+        """
         device = self.device
         while True:
             start=time.time()
@@ -173,7 +214,7 @@ class Learner:
 
                 #Doing the heavy logging here!
                 if self.log:
-                    self.sample(8)
+                    self.sample()
                 
             if (self.step+1) % self.args.log_interval == 0:
                 #Doing all the light logging here!
@@ -185,8 +226,9 @@ class Learner:
 
             print("Step: ",self.step,", Loss: ",loss.item(),", Time: ",end-start)
 
-    def get_data_batch():
+    def get_data_batch(self):
         #get one batch of data from the dataset and resample it (if necessary)
+        
         y=self.train_set.next()    
         y=y.to(self.device)
 
@@ -200,7 +242,7 @@ class Learner:
         for param in self.model.parameters():
             param.grad = None
 
-        audio = get_data_batch()
+        audio = self.get_data_batch()
 
         N, T = audio.shape
         device=audio.device
@@ -221,6 +263,7 @@ class Learner:
         noise = torch.randn_like(audio)*sigma
 
         #apply the NN
+        
         estimate=self.model(cin*(audio+noise),cnoise) 
 
         #target as in Karras et al. "Elucidating..." Eq. 8
@@ -246,13 +289,13 @@ class Learner:
 
     def _write_summary_sample(self,res, string):
         #print(res.shape)
-        spec_sample=utils_plotting.plot_spectrogram_from_raw_audio(res, self.args.stft)
+        spec_sample=utils_logging.plot_spectrogram_from_raw_audio(res, self.args.stft)
         wandb.log({"spec_sample_"+str(string): spec_sample}, step=self.step)
 
-        audio_path=utils_plotting.write_audio_file(res, self.args.sample_rate)
+        audio_path=utils_logging.write_audio_file(res, self.args.sample_rate)
         wandb.log({"audio_sample_"+str(string): wandb.Audio(audio_path, sample_rate=self.args.sample_rate)},step=self.step)
 
-        spec_sample=utils_plotting.plot_CQT_from_raw_audio(res, self.args)
+        spec_sample=utils_logging.plot_CQT_from_raw_audio(res, self.args)
         wandb.log({"CQT_sample_"+str(string): spec_sample}, step=self.step)
 
     def _write_summary(self, step):
@@ -275,7 +318,7 @@ class Learner:
             sum_loss_in_bins[i_bin]+=self.accumulated_losses[k]
         
         #write a fancy plot to log in wandb
-        figure=utils_plotting.plot_loss_by_sigma_train(sum_loss_in_bins, num_elems_in_bins, quantized_sigma_values[:-1])
+        figure=utils_logging.plot_loss_by_sigma_train(sum_loss_in_bins, num_elems_in_bins, quantized_sigma_values[:-1])
         wandb.log({"loss_dependent_on_sigma": figure}, step=self.step)
 
         averaged_loss=np.mean(self.accumulated_losses)
