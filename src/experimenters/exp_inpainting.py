@@ -29,7 +29,7 @@ class Exp_Inpainting(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=SamplerInpainting(self.model, self.diff_parameters, self.args, args.inference.alpha, order=2, data_consistency=not(args.inference.no_replace), rid=self.__plot_animation)
+        self.sampler=SamplerInpainting(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=not(args.inference.no_replace), rid=self.__plot_animation)
 
         today=date.today() 
         self.path_sampling=os.path.join(args.model_dir,self.args.inference.mode+today.strftime("%d/%m/%Y"))

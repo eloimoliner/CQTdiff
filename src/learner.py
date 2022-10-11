@@ -292,7 +292,7 @@ class Learner:
         spec_sample=utils_logging.plot_spectrogram_from_raw_audio(res, self.args.stft)
         wandb.log({"spec_sample_"+str(string): spec_sample}, step=self.step)
 
-        audio_path=utils_logging.write_audio_file(res, self.args.sample_rate)
+        audio_path=utils_logging.write_audio_file(res,self.args.sample_rate, string)
         wandb.log({"audio_sample_"+str(string): wandb.Audio(audio_path, sample_rate=self.args.sample_rate)},step=self.step)
 
         spec_sample=utils_logging.plot_CQT_from_raw_audio(res, self.args)

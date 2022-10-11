@@ -1,0 +1,140 @@
+dset:
+  name: maestro
+  path: /scratch/shareddata/dldata/maestro/v3.0.0/maestro-v3.0.0
+  years:
+  - 2004
+  - 2006
+  - 2008
+  - 2009
+  - 2011
+  - 2013
+  - 2014
+  - 2015
+  years_test:
+  - 2009
+wandb:
+  entity: eloimoliner
+  project: CQTDiff
+  run_name: testing_training_code
+model_dir: experiments/cqt
+architecture: unet_CQT
+sample_rate: 22050
+audio_len: 65536
+resample_factor: 2
+num_workers: 4
+device: cpu
+sashimi:
+  unconditional: false
+  in_channels: 1
+  out_channels: 2
+  diffusion_step_embed_dim_in: 128
+  diffusion_step_embed_dim_mid: 512
+  diffusion_step_embed_dim_out: 512
+  unet: true
+  d_model: 64
+  n_layers: 6
+  pool:
+  - 4
+  - 4
+  expand: 2
+  ff: 2
+  L: ${audio_len}
+stft:
+  win_size: 1024
+  hop_size: 256
+  model:
+    win_size: 1024
+    hop_size: 256
+cqt:
+  binsoct: 64
+  numocts: 7
+  fmax: nyq
+  fmin: 150
+  use_norm: true
+unet:
+  padding: zeros
+  use_attention: true
+  num_att_heads: 4
+  use_gru: true
+  conditioner:
+    use_conditioning: true
+save_model: false
+unet_STFT:
+  use_embedding_y_lpf: false
+  use_attention: false
+  depth: 5
+  use_fencoding: true
+  nlayers:
+  - 8
+  - 7
+  - 6
+  - 5
+  - 4
+  - 3
+lr: 0.0002
+batch_size: 4
+ema_rate: 0.9999
+scheduler_step_size: 60000
+scheduler_gamma: 0.8
+restore: false
+checkpoint_id: None
+log_interval: 10
+save_interval: 100
+n_bins: 20
+inference:
+  mode: bandwidth_extension
+  load:
+    load_mode: maestro_test
+    audio: None
+    data_directory: None
+    seg_size: 65536
+    seg_idx: 10
+  checkpoint: weights-319999.pt
+  exp_name: cqt
+  T: 35
+  num_sample_chunks: 1
+  unconditional:
+    num_samples: 1
+  xi: 0.2
+  data_consistency: true
+  sampler: deterministic
+  noise_in_observations: 0
+  bandwidth_extension:
+    filter:
+      type: firwin
+      fc: 1000
+      order: 500
+      fir_order: 600
+      beta: 1
+      ripple: 0.05
+  inpainting:
+    gap_length: 1500
+    start_gap_idx: None
+  comp_sens:
+    percentage: 5
+  phase_retrieval:
+    win_size: 1024
+    hop_size: 256
+  max_thresh_grads: 1
+  type_spec: linear
+  declipping:
+    SDR: 3
+extra_info: cqt
+sde_type: VE_elucidating
+diffusion_parameters:
+  sigma_data: 0.057
+  sigma_min: 0.0001
+  sigma_max: 1
+  P_mean: -1.2
+  P_std: 1.2
+  ro: 13
+  ro_train: 10
+  Schurn: 5
+  Snoise: 1
+  Stmin: 0
+  Stmax: 50
+sde_kwargs:
+  gamma: None
+  eta: None
+  sigma_min: 0.0001
+  sigma_max: 1

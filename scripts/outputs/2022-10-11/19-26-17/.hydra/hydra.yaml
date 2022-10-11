@@ -1,0 +1,171 @@
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  launcher:
+    _target_: hydra._internal.core_plugins.basic_launcher.BasicLauncher
+  sweeper:
+    _target_: hydra._internal.core_plugins.basic_sweeper.BasicSweeper
+    max_batch_size: null
+  help:
+    app_name: ${hydra.job.name}
+    header: '${hydra.help.app_name} is powered by Hydra.
+
+      '
+    footer: 'Powered by Hydra (https://hydra.cc)
+
+      Use --hydra-help to view Hydra specific help
+
+      '
+    template: '${hydra.help.header}
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (group=option)
+
+
+      $APP_CONFIG_GROUPS
+
+
+      == Config ==
+
+      Override anything in the config (foo.bar=value)
+
+
+      $CONFIG
+
+
+      ${hydra.help.footer}
+
+      '
+  hydra_help:
+    template: 'Hydra (${hydra.runtime.version})
+
+      See https://hydra.cc for more info.
+
+
+      == Flags ==
+
+      $FLAGS_HELP
+
+
+      == Configuration groups ==
+
+      Compose your configuration from those groups (For example, append hydra/job_logging=disabled
+      to command line)
+
+
+      $HYDRA_CONFIG_GROUPS
+
+
+      Use ''--cfg hydra'' to Show the Hydra config.
+
+      '
+    hydra_help: ???
+  hydra_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][HYDRA] %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+    root:
+      level: INFO
+      handlers:
+      - console
+    loggers:
+      logging_example:
+        level: DEBUG
+    disable_existing_loggers: false
+  job_logging:
+    version: 1
+    formatters:
+      simple:
+        format: '[%(asctime)s][%(name)s][%(levelname)s] - %(message)s'
+    handlers:
+      console:
+        class: logging.StreamHandler
+        formatter: simple
+        stream: ext://sys.stdout
+      file:
+        class: logging.FileHandler
+        formatter: simple
+        filename: ${hydra.job.name}.log
+    root:
+      level: INFO
+      handlers:
+      - console
+      - file
+    disable_existing_loggers: false
+  env: {}
+  searchpath: []
+  callbacks: {}
+  output_subdir: .hydra
+  overrides:
+    hydra: []
+    task:
+    - model_dir=experiments/cqt
+    - architecture=unet_CQT
+    - inference.mode=bandwidth_extension
+    - inference.load.load_mode=maestro_test
+    - inference.load.seg_size=65536
+    - inference.load.seg_idx=10
+    - inference.checkpoint=weights-319999.pt
+    - inference.bandwidth_extension.filter.type=firwin
+    - inference.bandwidth_extension.filter.order=500
+    - inference.bandwidth_extension.filter.fc=1000
+    - inference.T=35
+    - extra_info=cqt
+    - inference.exp_name=cqt
+    - diffusion_parameters.sigma_min=1e-4
+    - diffusion_parameters.sigma_max=1
+    - diffusion_parameters.ro=13
+    - diffusion_parameters.Schurn=5
+    - inference.xi=0.2
+    - audio_len=65536
+    - inference.data_consistency=True
+  job:
+    name: sample
+    override_dirname: architecture=unet_CQT,audio_len=65536,diffusion_parameters.Schurn=5,diffusion_parameters.ro=13,diffusion_parameters.sigma_max=1,diffusion_parameters.sigma_min=1e-4,extra_info=cqt,inference.T=35,inference.bandwidth_extension.filter.fc=1000,inference.bandwidth_extension.filter.order=500,inference.bandwidth_extension.filter.type=firwin,inference.checkpoint=weights-319999.pt,inference.data_consistency=True,inference.exp_name=cqt,inference.load.load_mode=maestro_test,inference.load.seg_idx=10,inference.load.seg_size=65536,inference.mode=bandwidth_extension,inference.xi=0.2,model_dir=experiments/cqt
+    id: ???
+    num: ???
+    config_name: conf
+    env_set: {}
+    env_copy: []
+    config:
+      override_dirname:
+        kv_sep: '='
+        item_sep: ','
+        exclude_keys:
+        - path_experiment
+        - hydra.job_logging.handles.file.filename
+  runtime:
+    version: 1.1.1
+    cwd: /scratch/work/molinee2/projects/ddpm/CQTdiff/scripts
+    config_sources:
+    - path: hydra.conf
+      schema: pkg
+      provider: hydra
+    - path: /scratch/work/molinee2/projects/ddpm/CQTdiff/conf
+      schema: file
+      provider: main
+    - path: ''
+      schema: structured
+      provider: schema
+    choices:
+      dset: maestro
+      hydra/env: default
+      hydra/callbacks: null
+      hydra/job_logging: default
+      hydra/hydra_logging: default
+      hydra/hydra_help: default
+      hydra/help: default
+      hydra/sweeper: basic
+      hydra/launcher: basic
+      hydra/output: default
+  verbose: false

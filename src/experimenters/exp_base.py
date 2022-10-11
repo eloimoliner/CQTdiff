@@ -13,7 +13,7 @@ class Exp_Base():
         #choose gpu as the device if possible
         self.device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        if self.args.architecture=="unet_CQT_nobias":
+        if self.args.architecture=="unet_CQT":
             self.model=Unet_CQT(self.args, self.device).to(self.device)
             self.model=load_ema_weights(self.model,os.path.join(args.model_dir, args.inference.checkpoint))
         else:

@@ -28,7 +28,7 @@ class Exp_Declipping(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=SamplerDeclipping(self.model, self.diff_parameters, self.args, args.inference.alpha, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
+        self.sampler=SamplerDeclipping(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
 
 
         self.__filter_final=utils_bwe.get_FIR_lowpass(100,10000,1,self.args.sample_rate)

@@ -27,7 +27,8 @@ class Exp_Unconditional(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=Sampler(self.model, self.diff_parameters, self.args, args.inference.alpha, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
+
+        self.sampler=Sampler(self.model, self.diff_parameters, self.args, 0, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
 
         self.__filter_final=utils_bwe.get_FIR_lowpass(100,10000,1,self.args.sample_rate)
         self.__filter_final=self.__filter_final.to(self.device)

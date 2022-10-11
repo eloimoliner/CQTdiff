@@ -42,14 +42,16 @@ audio_len=65536
 #audio_len=524288
 #audio_len=160531
 
-mode="declipping"
 
 python sample.py $iteration \
          model_dir="$PATH_EXPERIMENT" \
+         architecture="unet_CQT" \
          inference.mode="bandwidth_extension" \
-         inference.load_mode="maestro_test" \
+         inference.load.load_mode="maestro_test" \
+         inference.load.seg_size=$audio_len\
+         inference.load.seg_idx=10\
          inference.checkpoint=$ckpt \
-         inference.bandwidth_extension.filter.filttype="firwin" \
+         inference.bandwidth_extension.filter.type="firwin" \
          inference.bandwidth_extension.filter.order=500 \
          inference.bandwidth_extension.filter.fc=1000 \
          inference.T=35 \
@@ -59,10 +61,9 @@ python sample.py $iteration \
          diffusion_parameters.sigma_max=1 \
          diffusion_parameters.ro=13\
          diffusion_parameters.Schurn=5 \
-         inference.alpha=0.2\
+         inference.xi=0.2\
          audio_len=$audio_len\
          inference.data_consistency=True\
-         inference.max_thresh_grads=0
 
 
 

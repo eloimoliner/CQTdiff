@@ -256,7 +256,10 @@ def plot_spectrogram(X, refr=None):
 
     return fig
 
-def write_audio_file(x, sr, string: str, path='tmp_audio/'):
+def write_audio_file(x, sr, string: str, path='tmp/'):
+    if not(os.path.exists(path)): 
+        os.makedirs(path)
+      
     path=path+string+".wav"
     x=x.flatten()
     x=x.unsqueeze(1)

@@ -5,11 +5,11 @@ import numpy as np
 import src.utils.logging as utils_logging
 class Sampler():
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
 
         self.model = model
         self.diff_params = diff_params
-        self.alpha=alpha #hyperparameter for the reconstruction guidance
+        self.xi=xi #hyperparameter for the reconstruction guidance
         self.order=order
         self.data_consistency=data_consistency #use reconstruction gudance without replacement
         self.args=args
@@ -41,7 +41,7 @@ class Sampler():
         normguide=torch.linalg.norm(rec_grads)/self.args.audio_len**0.5
         
         #normalize scaling
-        s=self.alpha/(normguide*t_i+1e-6)
+        s=self.xi/(normguide*t_i+1e-6)
         
         #optionally apply a treshold to the gradients
         if self.treshold_on_grads>0:
@@ -65,7 +65,7 @@ class Sampler():
                 score=(x_hat-x)/t_i**2
             return score
         else:
-            if self.alpha>0:
+            if self.xi>0:
                 #apply rec. guidance
                 score=self.get_score_rec_guidance(x, y, t_i, degradation)
     
@@ -174,10 +174,10 @@ class Sampler():
 
 class SamplerPhaseRetrieval(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
         assert data_consistency==False
-        assert alpha>0
+        assert xi>0
 
     def apply_mask(self, x):
         return self.mask*x
@@ -205,10 +205,10 @@ class SamplerPhaseRetrieval(Sampler):
 
 class SamplerCompSens(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
         assert data_consistency==False
-        assert alpha>0
+        assert xi>0
 
     def apply_mask(self, x):
         return self.mask*x
@@ -228,10 +228,10 @@ class SamplerCompSens(Sampler):
 
 class SamplerDeclipping(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
         assert data_consistency==False
-        assert alpha>0
+        assert xi>0
 
     def apply_clip(self,x):
         x_hat=torch.clip(x,min=-self.clip_value, max=self.clip_value)
@@ -255,8 +255,8 @@ class SamplerDeclipping(Sampler):
 
 class SamplerInpainting(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
 
     def apply_mask(self, x):
         return self.mask*x
@@ -275,8 +275,8 @@ class SamplerInpainting(Sampler):
 
 class SamplerBWE(Sampler):
 
-    def __init__(self, model, diff_params, args, alpha=0, order=2, data_consistency=False, rid=False):
-        super().__init__(model, diff_params, args, alpha, order, data_consistency, rid)
+    def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
+        super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
 
     def apply_FIR_filter(self,y):
         y=y.unsqueeze(1)
@@ -288,6 +288,7 @@ class SamplerBWE(Sampler):
         return y_lpf
 
     def predict_bwe(
+        self,
         ylpf,  #observations (lowpssed signal) Tensor with shape (L,)
         filt, #filter Tensor with shape ??
         ):
@@ -296,8 +297,6 @@ class SamplerBWE(Sampler):
         self.filt=filt.to(ylpf.device)
         degradation=lambda x: self.apply_FIR_filter(x)
 
-        if self.rid: raise NotImplementedError
-        res=self.predict_conditional(ylpf, degradation)
-        return res
+        return self.predict_conditional(ylpf, degradation)
         
                 

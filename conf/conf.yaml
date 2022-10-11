@@ -3,8 +3,8 @@ defaults:
 
 wandb:
   entity: "eloimoliner"
-  project: "diffusion_june_2022"
-  run_name: "unnamed"
+  project: "CQTDiff"
+  run_name: "testing_training_code"
 
 model_dir: "experiments/cqt"
 
@@ -110,7 +110,7 @@ inference:
   num_sample_chunks: 1
   unconditional:
     num_samples: 1
-  alpha: 0 #restoration guidance, 0 means no guidance
+  xi: 0 #restoration guidance, 0 means no guidance
   data_consistency: False
   sampler: "deterministic" #wether deterministic or stochastic
   noise_in_observations: 0
@@ -145,7 +145,7 @@ diffusion_parameters:
   sigma_max: 10
   P_mean: -1.2 #what is this for?
   P_std: 1.2 #ehat is this for?
-  ro: 10
+  ro: 13
   ro_train: 10
   Schurn: 5
   Snoise: 1
@@ -156,7 +156,7 @@ sde_kwargs:
   gamma: None
   eta: None
   sigma_min: 1e-4
-  sigma_max: 0.999
+  sigma_max: 1
 
      
 hydra:
