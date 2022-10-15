@@ -1,5 +1,6 @@
 from tqdm import tqdm
 import torch
+import torchaudio
 import scipy.signal
 import numpy as np
 import src.utils.logging as utils_logging
@@ -99,6 +100,17 @@ class Sampler():
         self.degradation=None
         return self.predict(shape, device)
 
+    def predict_resample(
+        self,
+        y,  #observations (lowpssed signal) Tensor with shape ??
+        shape,
+        degradation, #lambda function
+    ):
+        self.degradation=degradation 
+        self.y=y
+        print(shape)
+        return self.predict(shape, y.device)
+
     def predict_conditional(
         self,
         y,  #observations (lowpssed signal) Tensor with shape ??
@@ -150,7 +162,6 @@ class Sampler():
             #apply second order correction
             h=t[i+1]-t_hat
 
-            if self.rid: data_denoised[i]=score*t_hat**2+x_hat
 
             if t[i+1]!=0 and self.order==2:  #always except last step
                 #second order correction2
@@ -166,6 +177,8 @@ class Sampler():
             elif t[i+1]==0 or self.order==1: #first condition  is to avoid dividing by 0
                 #first order Euler step
                 x=x_hat+h*d
+
+            if self.rid: data_denoised[i]=x
             
         if self.rid:
             return x.detach(), data_denoised.detach(), t.detach()
@@ -214,6 +227,7 @@ class SamplerCompSens(Sampler):
         return self.mask*x
 
     def predict_compsens(
+        self,
         y_masked,
         mask
         ):
@@ -222,9 +236,7 @@ class SamplerCompSens(Sampler):
 
         degradation=lambda x: self.apply_mask(x)
 
-        if self.rid: raise NotImplementedError
-        res=self.predict_conditional(y_masked, degradation)
-        return res
+        return self.predict_conditional(y_masked, degradation)
 
 class SamplerDeclipping(Sampler):
 
@@ -286,16 +298,55 @@ class SamplerBWE(Sampler):
         y_lpf=y_lpf.squeeze(1) 
 
         return y_lpf
+    def apply_IIR_filter(self,y):
+        y_lpf=torchaudio.functional.lfilter(y, self.a,self.b, clamp=False)
+        return y_lpf
+    def apply_biquad(self,y):
+        y_lpf=torchaudio.functional.biquad(y, self.b0, self.b1, self.b2, self.a0, self.a1, self.a2)
+        return y_lpf
+    def decimate(self,x):
+        return x[...,0:-1:self.factor]
+
+    def resample(self,x):
+        N=100
+        return torchaudio.functional.resample(x,orig_freq=int(N*self.factor), new_freq=N)
 
     def predict_bwe(
         self,
         ylpf,  #observations (lowpssed signal) Tensor with shape (L,)
         filt, #filter Tensor with shape ??
+        filt_type
         ):
 
         #define the degradation model as a lambda
-        self.filt=filt.to(ylpf.device)
-        degradation=lambda x: self.apply_FIR_filter(x)
+        if filt_type=="firwin":
+            self.filt=filt.to(ylpf.device)
+            degradation=lambda x: self.apply_FIR_filter(x)
+        elif filt_type=="cheby1":
+            b,a=filt
+            self.a=torch.Tensor(a).to(ylpf.device)
+            self.b=torch.Tensor(b).to(ylpf.device)
+            degradation=lambda x: self.apply_IIR_filter(x)
+        elif filt_type=="biquad":
+            b0, b1, b2, a0, a1, a2=filt
+            self.b0=torch.Tensor(b0).to(ylpf.device)
+            self.b1=torch.Tensor(b1).to(ylpf.device)
+            self.b2=torch.Tensor(b2).to(ylpf.device)
+            self.a0=torch.Tensor(a0).to(ylpf.device)
+            self.a1=torch.Tensor(a1).to(ylpf.device)
+            self.a2=torch.Tensor(a2).to(ylpf.device)
+            degradation=lambda x: self.apply_biquad(x)
+        elif filt_type=="resample":
+            self.factor =filt
+            degradation= lambda x: self.resample(x)
+            return self.predict_resample(ylpf,(ylpf.shape[0], self.args.audio_len), degradation)
+        elif filt_type=="decimate":
+            self.factor =filt
+            degradation= lambda x: self.decimate(x)
+            return self.predict_resample(ylpf,(ylpf.shape[0], self.args.audio_len), degradation)
+           
+        else:
+           raise NotImplementedError
 
         return self.predict_conditional(ylpf, degradation)
         

@@ -30,3 +30,4 @@ class Exp_Base():
         self.path_sampling=os.path.join(args.model_dir,self.args.inference.mode+today.strftime("%d_%m_%Y"))
         if not os.path.exists(self.path_sampling):
             os.makedirs(self.path_sampling)
+

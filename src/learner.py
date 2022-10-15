@@ -18,45 +18,22 @@ from src.sde import  VE_Sde_Elucidating
 
 
 class Learner:
-    """The summary line for a class docstring should fit on one line.
-
-    If the class has public attributes, they may be documented here
-    in an ``Attributes`` section and follow the same formatting as a
-    function's ``Args`` section. Alternatively, attributes may be documented
-    inline with the attribute's declaration (see __init__ method below).
-
-    Properties created with the ``@property`` decorator should be documented
-    in the property's getter method.
-
-    Attributes:
-        attr1 (str): Description of `attr1`.
-        attr2 (:obj:`int`, optional): Description of `attr2`.
-
-    """
     def __init__(
         self, model_dir, model, train_set,  optimizer, args, log=True
     ):
-        """Example of docstring on the __init__ method.
-
-        The __init__ method may be documented in either the class level
-        docstring, or as a docstring on the __init__ method itself.
-
-        Either form is acceptable, but the two should not be mixed. Choose one
-        convention to document the __init__ method and be consistent with it.
-
-        Note:
-            Do not include the `self` parameter in the ``Args`` section.
-
+        """
         Args:
-            param1 (str): Description of `param1`.
-            param2 (:obj:`int`, optional): Description of `param2`. Multiple
-                lines are supported.
-            param3 (:obj:`list` of :obj:`str`): Description of `param3`.
+            model_dir (str): Path where the model weights and logs will be saved.
+            model (nn.Module): Module of the neural network
+            train_set (DataLoader): DataLoader of the training dataset
+            args (dicitionary):  Dictionary of arguments from hydra
+            log (bool, optional): Flag that indicates wether the learner will log on wandb
 
         """
         os.makedirs(model_dir, exist_ok=True)
         self.model_dir = model_dir
         self.model = model
+
         self.step = 0
         self.device=next(self.model.parameters()).device
         if args.restore:
@@ -75,7 +52,7 @@ class Learner:
 
         self.ema_rate = args.ema_rate
         self.train_set = train_set
-        self.optimizer = optimizer
+        self.optimizer = torch.optim.Adam(self.model.parameters(), lr=self.args.lr)
         self.scheduler = torch.optim.lr_scheduler.StepLR(
             self.optimizer, step_size=self.args.scheduler_step_size, gamma=self.args.scheduler_gamma)
 
@@ -91,7 +68,6 @@ class Learner:
 
 
         self.cum_grad_norms = 0
-        #self.filters=lowpass_utils.get_random_FIR_filters(self.args.bwe.num_random_filters, mean_fc=self.args.bwe.lpf.mean_fc, std_fc=self.args.bwe.lpf.std_fc, device=self.device,sr=self.args.sample_rate)# more parameters here
         self.log=log
         if self.log:
             #report hyperparameters. add or remove here the relevant hyperparams
@@ -175,6 +151,9 @@ class Learner:
             return False
 
     def sample(self):
+        """
+        Sample some unconditional examples
+        """
         shape=(self.args.inference.unconditional.num_samples, self.args.audio_len)
 
         res=self.sampler.predict_unconditional(shape, self.device)
@@ -183,25 +162,23 @@ class Learner:
 
 
     def train(self):
-        """Class methods are similar to regular functions.
-
-        Note:
-            Do not include the `self` parameter in the ``Args`` section.
-
-        Args:
-            param1: The first parameter.
-            param2: The second parameter.
-
-        Returns:
-            True if successful, False otherwise.
-
+        """
+        Training loop
+        If "save_model" is set:
+                Will save a checkpoint a checkpoint every "save_interval" steps
+        If "log" is set
+                Will sample some unconditional examples every "save_interval" steps
+                Will log a summary every "log_interval" steps
+                Everything is logged into wandb
         """
         device = self.device
         while True:
             start=time.time()
             
+            #calling the train_step(), which  does all the important stuff
             loss, vectorial_loss, sigma= self.train_step()
 
+            #all of this is just some data manipulation for logging (not critical stufff)
             sigma_detach = sigma.clone().detach().cpu().numpy()
             sigma_detach = np.reshape(sigma_detach, -1)
             vectorial_loss = torch.mean(vectorial_loss, 1).cpu().numpy()
@@ -210,16 +187,18 @@ class Learner:
 
             if (self.step+1) % self.args.save_interval==0:
                 if self.args.save_model:
+                    #Will save a checkpoint a checkpoint every "save_interval" steps
                     self.save_to_checkpoint()
 
-                #Doing the heavy logging here!
                 if self.log:
+                    #Will sample some unconditional examples every "save_interval" steps, to wandb
                     self.sample()
                 
             if (self.step+1) % self.args.log_interval == 0:
-                #Doing all the light logging here!
+
                 if self.log:
-                    self._write_summary(self.step)
+                    #Will log a summary every "log_interval" steps to wandb
+                    self._write_summary()
 
             self.step += 1
             end=time.time()
@@ -238,10 +217,14 @@ class Learner:
         return y
 
     def train_step(self):
+        """
+        Core of this file, here the trainig is happening
+        """
 
         for param in self.model.parameters():
             param.grad = None
 
+        #sample some data from the dataset
         audio = self.get_data_batch()
 
         N, T = audio.shape
@@ -263,7 +246,6 @@ class Learner:
         noise = torch.randn_like(audio)*sigma
 
         #apply the NN
-        
         estimate=self.model(cin*(audio+noise),cnoise) 
 
         #target as in Karras et al. "Elucidating..." Eq. 8
@@ -272,34 +254,53 @@ class Learner:
         #apply the L2 loss
         loss = self.loss_fn(estimate, target) 
 
+        #get the gradients
         loss.backward()
 
+        #clip the gradients
         self.grad_norm = nn.utils.clip_grad_norm_(self.model.parameters(), 1.0)
+
+        #update the weights
         self.optimizer.step()
+
+        #this is a learning rate scheduler
         self.scheduler.step()
 
+        #save the EMA weights.  These are the ones we will use for testing
         self.update_ema_weights()
 
+        #this is just for logging
         vectorial_loss = self.v_loss(estimate, target).detach()
 
+        #also for logging
         self.cum_grad_norms += self.grad_norm
 
         return loss, vectorial_loss, sigma
 
 
     def _write_summary_sample(self,res, string):
-        #print(res.shape)
+        """
+        Logging after sampling
+        Args:
+            res (Tensor): (B,T) the sampled audio files to log
+            string (str): some identifier
+        """
+        #log a figure with spectrograms
         spec_sample=utils_logging.plot_spectrogram_from_raw_audio(res, self.args.stft)
         wandb.log({"spec_sample_"+str(string): spec_sample}, step=self.step)
 
+        #log audio example
         audio_path=utils_logging.write_audio_file(res,self.args.sample_rate, string)
         wandb.log({"audio_sample_"+str(string): wandb.Audio(audio_path, sample_rate=self.args.sample_rate)},step=self.step)
 
+        #log a figure of CQT-spectrograms
         spec_sample=utils_logging.plot_CQT_from_raw_audio(res, self.args)
         wandb.log({"CQT_sample_"+str(string): spec_sample}, step=self.step)
 
-    def _write_summary(self, step):
-        #just logging a plot of the loss and a couple of scalars
+    def _write_summary(self):
+        """
+        Logging some info into wandb, just a plot of the loss and a couple of scalars
+        """
 
         sigma_max=self.diff_parameters.sigma_max
         sigma_min=self.diff_parameters.sigma_min
@@ -317,17 +318,19 @@ class Learner:
             num_elems_in_bins[i_bin]+=1
             sum_loss_in_bins[i_bin]+=self.accumulated_losses[k]
         
-        #write a fancy plot to log in wandb
+        #this plots the averaged training loss for each noise level. This actually gives very useful information!
         figure=utils_logging.plot_loss_by_sigma_train(sum_loss_in_bins, num_elems_in_bins, quantized_sigma_values[:-1])
         wandb.log({"loss_dependent_on_sigma": figure}, step=self.step)
 
+        #log the avergaed loss
         averaged_loss=np.mean(self.accumulated_losses)
         wandb.log({"averaged_loss": averaged_loss},step=self.step)
 
+        #log the averaged gradient norms
         mean_grad_norms = self.cum_grad_norms /num_elems_in_bins.sum() * self.args.batch_size
-
         wandb.log({"mean_grad_norm": mean_grad_norms},step=self.step, commit=True)
 
+        #restart these cumulative variables
         self.cum_grad_norms = 0
         self.accumulated_losses=None
         self.accumulated_losses_sigma=None

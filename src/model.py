@@ -10,41 +10,70 @@ from src.CQT_nsgt import CQT_cpx
 import torchaudio
 import src.utils.logging as utils_logging
 class CombinerUp(nn.Module):
+    """
+    Combining after upsampling in the decoder side, using progressive growing at the style of stylegan2
+    """
 
-    def __init__(self,mode, Npyr, Nx, bias=True):
+    def __init__(self, Npyr, Nx, bias=True):
+        """
+        Args:
+            Npyr (int): Number of channels of the pyramidal signal to upsample (usually 2)
+            Nx (int): Number of channels of the latent vector to combine
+        """
         super().__init__()
         self.conv1x1=nn.Conv2d(Nx, Npyr,1, bias=bias)
-        self.mode=mode
         #self.GN=nn.GroupNorm(8,Nx)
         torch.nn.init.constant_(self.conv1x1.weight, 0)
     def forward(self,pyr,x):
+        """
+        Args:
+            pyr (Tensor): shape (B,C=2,F,T) pyramidal signal 
+            x (Tensor): shape (B,C,F,T)  latent 
+        Returns:
+           Rensor with same shape as x
+        """
                 
-        if self.mode=="sum":
-            x=self.conv1x1(x)
-            if pyr==None:
-                return x
-            else:
-                
-                return (pyr[...,0:x.shape[-1]]+x)/(2**0.5)
-                #return (pyr[...,0:x.shape[-1]]+x)/(2**0.5)
+        x=self.conv1x1(x)
+        if pyr==None:
+            return x
         else:
-            raise NotImplementedError
+            
+            return (pyr[...,0:x.shape[-1]]+x)/(2**0.5)
 
 class CombinerDown(nn.Module):
+    """
+    Combining after downsampling in the encoder side, with progressive growing at the style of stylegan2
+    """
 
-    def __init__(self,mode, Nin, Nout, bias=True):
+    def __init__(self, Nin, Nout, bias=True):
+        """
+        Args:
+            Npyr (int): Number of channels of the pyramidal signal to downsample (usually 2)
+            Nx (int): Number of channels of the latent vector to combine
+        """
         super().__init__()
         self.conv1x1=nn.Conv2d(Nin, Nout,1, bias=bias)
-        self.mode=mode
+
     def forward(self,pyr,x):
-        if self.mode=="sum":
-            pyr=self.conv1x1(pyr)
-            return (pyr+x)/(2**0.5)
-        else:
-            raise NotImplementedError
+        """
+        Args:
+            pyr (Tensor): shape (B,C=2,F,T) pyramidal signal 
+            x (Tensor): shape (B,C,F,T)  latent 
+        Returns:
+            Tensor with same shape as x
+        """
+        pyr=self.conv1x1(pyr)
+        return (pyr+x)/(2**0.5)
 
 class Upsample(nn.Module):
+    """
+        Upsample time dimension using resampling
+    """
     def __init__(self,S):
+        """
+        Args:
+            S (int): upsampling factor (usually 2)
+        """
         super().__init__()
         N=2**12
         self.resample=torchaudio.transforms.Resample(N,N*S) #I use 3**12 as an arbitrary number, as we don't care about the sampling frequency of the latents
@@ -53,7 +82,14 @@ class Upsample(nn.Module):
         return self.resample(x) 
 
 class Downsample(nn.Module):
+    """
+        Downsample time dimension using resampling
+    """
     def __init__(self,S):
+        """
+        Args:
+            S (int): downsampling factor (usually 2)
+        """
         super().__init__()
         N=2**12
         self.resample=torchaudio.transforms.Resample(N,N/S) #I use 2**12 as an arbitrary number, as we don't care about the sampling frequency of the latents
@@ -63,6 +99,12 @@ class Downsample(nn.Module):
     
 
 class RFF_MLP_Block(nn.Module):
+    """
+        Encoder of the noise level embedding
+        Consists of:
+            -Random Fourier Feature embedding
+            -MLP
+    """
     def __init__(self):
         super().__init__()
         self.RFF_freq = nn.Parameter(
@@ -169,6 +211,7 @@ class FreqEncodingRFF(nn.Module):
     
 
     def forward(self, input_tensor):
+        
 
         #print(input_tensor.shape)
         batch_size_tensor = input_tensor.shape[0]  # get batch size
@@ -459,8 +502,15 @@ class ResnetBlock(nn.Module):
         return (y + self.res_conv(x))/(2**0.5)
 
 class Unet_CQT(nn.Module):
-
+    """
+        Main U-Net model based on the CQT
+    """
     def __init__(self, args, device):
+        """
+        Args:
+            args (dictionary): hydra dictionary
+            device: torch device ("cuda" or "cpu")
+        """
         super(Unet_CQT, self).__init__()
         self.args=args
         self.depth=6
@@ -474,11 +524,9 @@ class Unet_CQT(nn.Module):
         self.CQTransform=CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, self.args.audio_len, device=self.device, split_0_nyq=False)
         Nin=2
 
-        #self.f_dim=self.args.stft.win_size//2 +1
         self.f_dim=self.fbins+2
         N_freq_encoding=32
-        #self.freqembeddings=FreqEncodingRFF(self.f_dim, N_freq_encoding).embeddings
-        #N_fencoding=32
+
         self.freq_encoding=AddFreqEncodingRFF(self.f_dim,N_freq_encoding)
         Nin=Nin+N_freq_encoding*2 #hardcoded
 
@@ -488,19 +536,8 @@ class Unet_CQT(nn.Module):
         self.Ns= [32, 64,64,128, 128, 128, 128, 128]
         self.Ss= [2,2,2,2,2,2]
         
-        #initial feature extractor
-        #ksize=(7,7)
-
-        #self.conv2d_1 = nn.Sequential(nn.Conv2d(Nin,self.Ns[0],
-        #              kernel_size=ksize,
-        #              padding='same',
-        #              padding_mode='reflect'),
-        ##              nn.ELU())
                         
         self.init_conv= nn.Conv2d(Nin,self.Ns[0],(5,3), padding="same", padding_mode="reflect", bias=False)
-        #self.final_conv= nn.Conv2d(self.Ns[0],2,(3,3), padding="same", padding_mode="reflect")
-
-        #initialize last layer with 0
 
 
         self.downs=nn.ModuleList([])
@@ -520,7 +557,7 @@ class Unet_CQT(nn.Module):
                                    nn.ModuleList([
                                             ResnetBlock(dim_in, dim_out, self.use_norm, bias=False),
                                             Downsample( self.Ss[i]),
-                                            CombinerDown("sum", 2, dim_out, bias=False)]))
+                                            CombinerDown( 2, dim_out, bias=False)]))
 
             elif i==(self.depth-1): #no downsampling in the last layer
                 self.downs.append(
@@ -545,7 +582,7 @@ class Unet_CQT(nn.Module):
                                             [
                                             ResnetBlock(dim_in, dim_out, use_norm=self.use_norm, bias=False),
                                             Upsample( self.Ss[i]),
-                                            CombinerUp("sum", 2, dim_out, bias=False)]))
+                                            CombinerUp( 2, dim_out, bias=False)]))
 
             elif i==0: #no downsampling in the last layer
                 self.ups.append(
@@ -559,19 +596,33 @@ class Unet_CQT(nn.Module):
 
 
     def setup_CQT_len(self, len):
+        """
+        Utility for setting the length in case this needs to be changed after having created the model
+        Args:
+           len (int): specified length
+        """
         self.CQTransform=CQT_cpx(self.fmin,self.fbins, self.args.sample_rate, len, device=self.device, split_0_nyq=False)
 
     def forward(self, inputs, sigma):
+        """
+        Args: 
+            inputs (Tensor):  Input signal in time-domsin, shape (B,T)
+            sigma (Tensor): noise levels,  shape (B,1)
+        Returns:
+            pred (Tensor): predicted signal in time-domain, shape (B,T)
+        """
+        #apply RFF embedding+MLP of the noise level
         sigma = self.embedding(sigma)
 
-        #inputs=inputs.squeeze(1) #need to squeeze to do the stft, I think
         
+        #apply CQT to the inputs
         xF =self.CQTransform.fwd(inputs)
         xF=xF.permute(0,3,2,1).contiguous()
-        pyr=xF
-        #print(xF.shape)
+        #xF:  shape (B,2,T,F)
 
-        #xF: B,C(1),T,F,2
+        #assign the pyramidal spectrogram to the inputs
+        pyr=xF
+
 
         if self.use_fencoding:
             xF=self.freq_encoding(xF)   

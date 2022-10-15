@@ -51,9 +51,10 @@ python sample.py $iteration \
          inference.load.seg_size=$audio_len\
          inference.load.seg_idx=10\
          inference.checkpoint=$ckpt \
-         inference.bandwidth_extension.filter.type="firwin" \
-         inference.bandwidth_extension.filter.order=500 \
+         inference.bandwidth_extension.filter.type="cheby1" \
+         inference.bandwidth_extension.filter.order=6 \
          inference.bandwidth_extension.filter.fc=1000 \
+         inference.bandwidth_extension.filter.ripple=0.05 \
          inference.T=35 \
          extra_info=$exp_name \
          inference.exp_name=$exp_name \
@@ -63,7 +64,7 @@ python sample.py $iteration \
          diffusion_parameters.Schurn=5 \
          inference.xi=0.2\
          audio_len=$audio_len\
-         inference.data_consistency=True\
+         inference.data_consistency=False\
 
 
 

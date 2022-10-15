@@ -37,7 +37,7 @@ echo $PATH_EXPERIMENT
 
 
 audio_len=65536
-#audio_len=131073
+#audio_len=131072
 #audio_len=262144
 #audio_len=1048576
 #audio_len=524288
@@ -47,17 +47,22 @@ audio_len=65536
 python sample.py $iteration \
          model_dir="$PATH_EXPERIMENT" \
          architecture="unet_CQT" \
-         inference.mode="unconditional" \
-         inference.unconditional.num_samples=64 \
+         inference.mode="compressive_sensing" \
+         inference.load.load_mode="maestro_test" \
+         inference.load.seg_size=$audio_len\
+         inference.load.seg_idx=10\
          inference.checkpoint=$ckpt \
-         inference.T=70 \
+         inference.comp_sens.percentage=5 \
+         inference.T=35 \
          extra_info=$exp_name \
          inference.exp_name=$exp_name \
          diffusion_parameters.sigma_min=1e-4 \
          diffusion_parameters.sigma_max=1 \
          diffusion_parameters.ro=13\
-         diffusion_parameters.Schurn=10 \
+         diffusion_parameters.Schurn=5 \
+         inference.xi=0.25\
          audio_len=$audio_len\
+         inference.data_consistency=False\
          inference.max_thresh_grads=0
 
 

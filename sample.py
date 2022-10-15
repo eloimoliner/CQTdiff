@@ -57,6 +57,9 @@ def run(args):
     elif mode=="inpainting":
         from src.experimenters.exp_inpainting import Exp_Inpainting
         exp=Exp_Inpainting(args, plot_animation)
+    elif mode=="compressive_sensing":
+        from src.experimenters.exp_comp_sens import Exp_CompSens
+        exp=Exp_CompSens(args, plot_animation)
 
     print(args.dset.name)
         

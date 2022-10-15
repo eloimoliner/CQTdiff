@@ -29,7 +29,7 @@ class Exp_Inpainting(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=SamplerInpainting(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=not(args.inference.no_replace), rid=self.__plot_animation)
+        self.sampler=SamplerInpainting(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
 
         today=date.today() 
         self.path_sampling=os.path.join(args.model_dir,self.args.inference.mode+today.strftime("%d/%m/%Y"))
@@ -60,7 +60,7 @@ class Exp_Inpainting(Exp_Base):
         gap=int(self.args.inference.inpainting.gap_length*self.args.sample_rate/1000)      
         self.mask=torch.ones((1,self.args.audio_len)).to(self.device) #assume between 5 and 6s of total length
 
-        if self.args.inference.inpainting.start_gap_idx ==None:
+        if self.args.inference.inpainting.start_gap_idx ==None: #we were crashing here!
             #the gap is placed at the center
             start_gap_index=int(self.args.audio_len//2 - gap//2) 
         else:

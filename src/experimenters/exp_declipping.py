@@ -75,7 +75,7 @@ class Exp_Declipping(Exp_Base):
         #input("stop")
         if self.__plot_animation:
             x_hat, data_denoised, t=self.sampler.predict_declipping(y,clip_value)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
+            fig=utils_logging.diffusion_CQT_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name, compression_factor=8)
         else:
             x_hat=self.sampler.predict_declipping(y,clip_value)
            

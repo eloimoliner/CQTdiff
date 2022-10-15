@@ -45,6 +45,7 @@ audio_len=65536
 
 
 python sample.py $iteration \
+         architecture="unet_CQT" \
          model_dir="$PATH_EXPERIMENT" \
          inference.mode="declipping" \
          inference.load.load_mode="maestro_test" \

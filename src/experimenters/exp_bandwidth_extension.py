@@ -15,7 +15,7 @@ class Exp_BWE(Exp_Base):
         self.__filter_final=utils_bwe.get_FIR_lowpass(100,10000,1,self.args.sample_rate)
         self.__filter_final=self.__filter_final.to(self.device)
 
-        n="lowpassed"+"_"+str(self.args.inference.declipping.SDR)
+        n="lowpassed"+"_"+str(self.args.inference.bandwidth_extension.filter.fc)
         self.path_degraded=os.path.join(self.path_sampling, n) #path for the lowpassed 
         #ensure the path exists
         if not os.path.exists(self.path_degraded):
@@ -39,6 +39,20 @@ class Exp_BWE(Exp_Base):
         if self.args.inference.bandwidth_extension.filter.type=="firwin":
             beta=self.args.inference.bandwidth_extension.filter.beta
             self.filter=utils_bwe.get_FIR_lowpass(order,fc, beta,self.args.sample_rate)
+        elif self.args.inference.bandwidth_extension.filter.type=="cheby1":
+            ripple =self.args.inference.bandwidth_extension.filter.ripple
+            b,a=utils_bwe.get_cheby1_ba(order, ripple, 2*fc/self.args.sample_rate) 
+            self.filter=(b,a)
+        elif self.args.inference.bandwidth_extension.filter.type=="biquad":
+            Q =self.args.inference.bandwidth_extension.filter.biquad.Q
+            parameters=utils_bwe.design_biquad_lpf(fc, self.args.sample_rate, Q) 
+            self.filter=parameters
+        elif self.args.inference.bandwidth_extension.filter.type=="resample":
+            self.filter= self.args.sample_rate/self.args.inference.bandwidth_extension.filter.resample.fs
+        elif self.args.inference.bandwidth_extension.filter.type=="decimate":
+            self.filter= int(self.args.inference.bandwidth_extension.decimate.factor)
+            self.args.inference.bandwidth_extension.filter.resample.fs=int(self.args.sample_rate/self.filter)
+
         elif args.inference.bandwidth_extension.filter.type=="cheby1filtfilt":
             raise NotImplementedError
         elif args.inference.bandwidth_extension.filter.type=="butter_fir":
@@ -47,7 +61,7 @@ class Exp_BWE(Exp_Base):
             raise NotImplementedError
         else:
             raise NotImplementedError
-        self.filter=self.filter.to(self.device)
+        #self.filter=self.filter.to(self.device)
 
 
 
@@ -60,20 +74,33 @@ class Exp_BWE(Exp_Base):
 
         #apply filter
         
-        y=utils_bwe.apply_low_pass(seg, self.filter) 
+        
+        y=utils_bwe.apply_low_pass(seg, self.filter, self.args.inference.bandwidth_extension.filter.type) 
+        print("dashape",y.shape)
+
+
+        if self.args.inference.noise_in_observations_SNR != "None":
+            SNR=10**(self.args.inference.noise_in_observations_SNR/10)
+    
+            sigma2_s=torch.var(y, -1)
+            sigma=torch.sqrt(sigma2_s/SNR)
+            y+=sigma*torch.randn(y.shape).to(y.device)
 
         #save clipped audio file
-        audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
+        if self.args.inference.bandwidth_extension.filter.type=="resample" or self.args.inference.bandwidth_extension.filter.type=="decimate":
+            audio_path=utils_logging.write_audio_file(y, self.args.inference.bandwidth_extension.filter.resample.fs, name, self.path_degraded+"/")
+        else:
+            audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
 
         #input("stop")
         if self.__plot_animation:
-            x_hat, data_denoised, t=self.sampler.predict_bwe(y,self.filter)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
+            x_hat, data_denoised, t=self.sampler.predict_bwe(y,self.filter,self.args.inference.bandwidth_extension.filter.type)
+            fig=utils_logging.diffusion_CQT_animation(self.path_reconstructed,  data_denoised, t, self.args, name="animation"+name, resample_factor=4)
         else:
-            x_hat=self.sampler.predict_bwe(y, self.filter)
+            x_hat=self.sampler.predict_bwe(y, self.filter,self.args.inference.bandwidth_extension.filter.type )
            
         #apply low pass filter to remove annoying artifacts at the nyquist frequency. I should try to fix this issue in future work
-        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final) 
+        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
         audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")

@@ -29,7 +29,7 @@ class Exp_CompSens(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=SamplerCompSens(self.model, self.diff_parameters, self.args, args.inference.alpha, order=2, data_consistency=not(args.inference.no_replace), rid=self.__plot_animation)
+        self.sampler=SamplerCompSens(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
 
 
         self.__filter_final=utils_bwe.get_FIR_lowpass(100,10000,1,self.args.sample_rate)
@@ -55,7 +55,7 @@ class Exp_CompSens(Exp_Base):
 
         
         self.mask=torch.ones((1,self.args.audio_len)).to(self.device) #assume between 5 and 6s of total length
-        num_samples=int(self.args.audio_len*self.args.inference.comp_sens.percentage/100)
+        num_samples=int(self.args.audio_len*(100-self.args.inference.comp_sens.percentage)/100)
         inds=np.random.choice(np.arange(args.audio_len),num_samples, replace=False) 
         self.mask[...,inds]=0
 
@@ -77,13 +77,13 @@ class Exp_CompSens(Exp_Base):
 
         #input("stop")
         if self.__plot_animation:
-            x_hat, data_denoised, t=self.sampler.predict(y,self.mask)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
+            x_hat, data_denoised, t=self.sampler.predict_compsens(y,self.mask)
+            fig=utils_logging.diffusion_CQT_animation(self.path_reconstructed,  data_denoised, t, self.args, name="animation"+name, resample_factor=3)
         else:
-            x_hat=self.sampler.predict(y,self.mask)
+            x_hat=self.sampler.predict_compsens(y,self.mask)
            
         #apply low pass filter to remove annoying artifacts at the nyquist frequency. I should try to fix this issue in future work
-        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final) 
+        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
         audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")

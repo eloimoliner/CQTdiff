@@ -53,7 +53,7 @@ class Exp_Unconditional(Exp_Base):
         shape=(1, self.args.audio_len)
         if self.__plot_animation:
             x_hat, data_denoised, t=self.sampler.predict_unconditional(shape, self.device)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
+            fig=utils_logging.diffusion_CQT_animation(self.path_reconstructed,  data_denoised, t, self.args, name="animation"+name, resample_factor=4)
         else:
             x_hat=self.sampler.predict_unconditional(shape,self.device)
            

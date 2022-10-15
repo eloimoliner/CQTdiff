@@ -11,6 +11,7 @@ import soundfile as sf
 import plotly.graph_objects as go
 import pandas as pd
 import plotly
+import scipy.signal as sig
 
 from src.CQT_nsgt import CQT_cpx
 def do_stft(noisy, clean=None, win_size=2048, hop_size=512, device="cpu", DC=True):
@@ -321,7 +322,22 @@ def get_spectrogram_from_raw_audio(x, stft, refr=1):
              res=torch.cat((res,o), 1)
     return res
 
-def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion" ):
+def downsample2d(inputArray, kernelSize):
+    """This function downsamples a 2d numpy array by convolving with a flat
+    kernel and then sub-sampling the resulting array.
+    A kernel size of 2 means convolution with a 2x2 array [[1, 1], [1, 1]] and
+    a resulting downsampling of 2-fold.
+    :param: inputArray: 2d numpy array
+    :param: kernelSize: integer
+    """
+    average_kernel = np.ones((kernelSize,kernelSize))
+
+    blurred_array = sig.convolve2d(inputArray, average_kernel, mode='same')
+    downsampled_array = blurred_array[::kernelSize,::kernelSize]
+    return downsampled_array
+
+
+def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion", resample_factor=1 ):
     #shape of input spectrograms:  (Nsteps,B,Time,Freq)
     #print(noisy.shape)
     Nsteps=x.shape[0]
@@ -338,24 +354,35 @@ def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion
 
     for i in tt:
         i=int(torch.floor(i))
-        print(i)
         i_s.append(i)
         xx=x[i]
-        print("xx",xx.shape)
         X=CQTransform.fwd(xx)
-        print("X",X.shape)
-        if allX==None:
-             allX=X
-        else:
-             allX=torch.cat((allX,X), 0)
 
-    print("allX",allX.shape)   #t,B,T,F, cpx
-      
-    allX=allX.cpu().numpy()
+        X=torch.sqrt(X[...,0]**2 + X[...,1]**2)
+
+        S_db = 10*torch.log10(torch.abs(X)/refr)
+        S_db = S_db[:,1:-1,1:-1]
+       
+        S_db=S_db.permute(0,2,1)
+        #np.transpose(S_db, (0,2,1))
+        S_db=torch.flip(S_db, [1])
+        S_db=S_db.unsqueeze(0)
+        S_db=torch.nn.functional.interpolate(S_db, size= (S_db.shape[2]//resample_factor, S_db.shape[3]//resample_factor), mode="bilinear")
+        S_db=S_db.squeeze(0)
+        S_db=S_db.cpu().numpy()
+        #S_db=S_db.squeeze(0)        
+
+        if i==0:
+             allX=S_db
+        else:
+             allX=np.concatenate((allX,S_db), 0)
     
-    fig=px.imshow(allX, animation_frame=0, facet_col=3) #I need to incorporate t here!!!
+    #fig=px.imshow(S_db, animation_frame=0, facet_col=3, binary_compression_level=0) #I need to incorporate t here!!!
+    fig=px.imshow(allX, animation_frame=0,  zmin=-40, zmax=10, binary_compression_level=0) #I need to incorporate t here!!!
 
     fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(showticklabels=False)
+    fig.update_yaxes(showticklabels=False)
     
     t=t[i_s].cpu().numpy()
        
@@ -372,6 +399,7 @@ def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion
 
 
     return fig
+
 def diffusion_spec_animation(path, x ,t,  stft, refr=1, name="animation_diffusion" ):
     #shape of input spectrograms:  (Nsteps,B,Time,Freq)
     #print(noisy.shape)

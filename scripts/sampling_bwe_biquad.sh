@@ -35,9 +35,8 @@ PATH_EXPERIMENT=experiments/$exp_name
 echo $PATH_EXPERIMENT
 
 
-
 audio_len=65536
-#audio_len=131073
+#audio_len=131072
 #audio_len=262144
 #audio_len=1048576
 #audio_len=524288
@@ -47,18 +46,24 @@ audio_len=65536
 python sample.py $iteration \
          model_dir="$PATH_EXPERIMENT" \
          architecture="unet_CQT" \
-         inference.mode="unconditional" \
-         inference.unconditional.num_samples=64 \
+         inference.mode="bandwidth_extension" \
+         inference.load.load_mode="maestro_test" \
+         inference.load.seg_size=$audio_len\
+         inference.load.seg_idx=10\
          inference.checkpoint=$ckpt \
-         inference.T=70 \
+         inference.bandwidth_extension.filter.type="biquad" \
+         inference.bandwidth_extension.filter.fc=1000 \
+         inference.bandwidth_extension.filter.biquad.Q=0.707 \
+         inference.T=35 \
          extra_info=$exp_name \
          inference.exp_name=$exp_name \
          diffusion_parameters.sigma_min=1e-4 \
          diffusion_parameters.sigma_max=1 \
          diffusion_parameters.ro=13\
-         diffusion_parameters.Schurn=10 \
+         diffusion_parameters.Schurn=5 \
+         inference.xi=0.35\
          audio_len=$audio_len\
-         inference.max_thresh_grads=0
+         inference.data_consistency=False\
 
 
 

@@ -53,12 +53,11 @@ def run(args):
     model=Unet_CQT(args, device).to(device)
 
     #prepare the optimizer
-    opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     from src.learner import Learner
     
     learner = Learner(
-        args.model_dir, model, train_set, opt, args, log=True
+        args.model_dir, model, train_set,  args, log=True
     )
 
     #start the training

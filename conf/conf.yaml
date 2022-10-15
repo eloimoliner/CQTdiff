@@ -113,8 +113,10 @@ inference:
   xi: 0 #restoration guidance, 0 means no guidance
   data_consistency: False
   sampler: "deterministic" #wether deterministic or stochastic
-  noise_in_observations: 0
+  noise_in_observations_SNR: None
   bandwidth_extension:
+    decimate:
+      factor: 1
     filter:
       type: "firwin" #or "cheby1_fir"
       fc: 1000 #cutoff frequency of the applied lpf
@@ -122,6 +124,10 @@ inference:
       fir_order: 600
       beta: 1
       ripple: 0.05 #for the cheby1
+      resample:
+        fs: 2000
+      biquad:
+        Q: 0.707
   inpainting:
     gap_length: 1500 #in ms
     start_gap_idx: None #in ms, None means at the middle
