@@ -205,6 +205,31 @@ def print_cuda_memory():
     f = r-a  # free inside reservedk
     print("memrylog",t,r,a,f)
 
+def plot_spectrogram(X, refr=None):
+    X=X.squeeze(1)
+    X=X.cpu().numpy()
+    X=np.sqrt(X[:,:,:,0]**2 + X[:,:,:,1]**2)
+    if refr==None:
+        refr=np.max(np.abs(X))+1e-8
+     
+    S_db = 10*np.log10(np.abs(X)/refr)
+
+    S_db=np.transpose(S_db, (0,2,1))
+    S_db=np.flip(S_db, axis=1)
+
+    for i in range(X.shape[0]): #iterate over batch size, shity way of ploting all the batched spectrograms
+        o=S_db[i]
+        if i==0:
+             res=o
+        else:
+             res=np.concatenate((res,o), axis=1)
+      
+    fig=px.imshow( res,  zmin=-40, zmax=20)
+
+    fig.update_layout(coloraxis_showscale=False)
+
+    return fig
+
 def plot_mag_spectrogram(X, refr=None, path=None,name="spec"):
     #X=X.squeeze(1)
     X=X.cpu().numpy()

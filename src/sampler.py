@@ -20,7 +20,33 @@ class Sampler():
         self.rid=rid
 
 
+    def data_consistency_step_phase_retrieval(self, x_hat, y):
+        """
+        Data consistency step only for the phase retrieval case, we are replacing the observed magnitude
+        """
+        #apply replacment (valid for linear degradations)
+        win_size=self.args.inference.phase_retrieval.win_size
+        hop_size=self.args.inference.phase_retrieval.hop_size
+
+        window=torch.hamming_window(window_length=win_size).to(x_hat.device)
+        #print(x.shape)
+        x2=torch.cat((x_hat, torch.zeros(x_hat.shape[0],win_size ).to(x_hat.device)),-1)
+        X=torch.stft(x2, win_size, hop_length=hop_size,window=window,center=False,return_complex=True)
+        phaseX=torch.angle(X)
+        assert y.shape == phaseX.shape, y.shape+" "+phaseX.shape
+        X_out=torch.polar(y, phaseX)
+        X_out=torch.view_as_real(X_out)
+        x_out=torch.istft(X_out, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
+        #print(x_hat.shape)
+        x_out=x_out[...,0:x_hat.shape[-1]]
+        #print(x_hat.shape, x.shape)
+        assert x_out.shape == x_hat.shape
+        return x_out
+
     def data_consistency_step(self, x_hat, y, degradation):
+        """
+        Simple replacement method, used for inpainting and FIR bwe
+        """
         #get reconstruction estimate
         den_rec= degradation(x_hat)     
         #apply replacment (valid for linear degradations)
@@ -32,7 +58,12 @@ class Sampler():
         x_hat=self.diff_params.denoiser(x, self.model, t_i.unsqueeze(-1))
         den_rec= degradation(x_hat) 
 
-        norm=torch.linalg.norm(y-den_rec, ord=2)
+        if len(y.shape)==3:
+            dim=(1,2)
+        elif len(y.shape)==2:
+            dim=1
+
+        norm=torch.linalg.norm(y-den_rec,dim=dim, ord=2)
         
         rec_grads=torch.autograd.grad(outputs=norm,
                                       inputs=x)
@@ -75,7 +106,10 @@ class Sampler():
                     #convert score to denoised estimate using Tweedie's formula
                     x_hat=score*t_i**2+x
     
-                    x_hat=self.data_consistency_step(x_hat,y, degradation)
+                    if self.args.inference.mode=="phase_retrieval":
+                        x_hat=self.data_consistency_step_phase_retrieval(x_hat,y)
+                    else:
+                        x_hat=self.data_consistency_step(x_hat,y, degradation)
     
                     #convert back to score
                     score=(x_hat-x)/t_i**2
@@ -110,6 +144,7 @@ class Sampler():
         self.y=y
         print(shape)
         return self.predict(shape, y.device)
+
 
     def predict_conditional(
         self,
@@ -185,37 +220,36 @@ class Sampler():
         else:
             return x.detach()
 
+
 class SamplerPhaseRetrieval(Sampler):
 
     def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):
         super().__init__(model, diff_params, args, xi, order, data_consistency, rid)
-        assert data_consistency==False
+        #assert data_consistency==False
         assert xi>0
 
-    def apply_mask(self, x):
-        return self.mask*x
-
     def apply_stft(self,x):
-        win_size=self.stft_args["win_size"]
-        hop_size=self.stft_args["hop_size"]
-        window=torch.hamming_window(window_length=win_size).to(x.device)
-        x2=torch.cat((x, torch.zeros(x.shape[0],win_size ).to(x.device)),-1)
-        X=torch.stft(x2, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
-        Y_hat=torch.sqrt(X[...,0]**2 + X[...,1]**2)
-        return Y_hat
+
+        x2=torch.cat((x,self.zeropad ),-1)
+        X=torch.stft(x2, self.win_size, hop_length=self.hop_size,window=self.window,center=False,return_complex=False)
+        Y=torch.sqrt(X[...,0]**2 + X[...,1]**2)
+        return Y
 
     def predict_pr(
-        spec,
-        stft_args
+        self,
+        y
         ):
-        self.stft_args=stft_args
+
+        self.win_size=self.args.inference.phase_retrieval.win_size
+        self.hop_size=self.args.inference.phase_retrieval.hop_size
+
+        print(y.shape)
+        self.zeropad=torch.zeros(y.shape[0],self.win_size ).to(y.device)
+        self.window=torch.hamming_window(window_length=self.win_size).to(y.device)
 
         degradation=lambda x: self.apply_stft(x)
 
-        if self.rid: raise NotImplementedError
-        res=self.predict_conditional(spec, degradation)
-        return res
-
+        return self.predict_resample(y, (y.shape[0], self.args.audio_len), degradation)
 class SamplerCompSens(Sampler):
 
     def __init__(self, model, diff_params, args, xi=0, order=2, data_consistency=False, rid=False):

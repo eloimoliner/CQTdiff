@@ -60,6 +60,9 @@ def run(args):
     elif mode=="compressive_sensing":
         from src.experimenters.exp_comp_sens import Exp_CompSens
         exp=Exp_CompSens(args, plot_animation)
+    elif mode=="phase_retrieval":
+        from src.experimenters.exp_phase_retrieval import Exp_PhaseRetrieval
+        exp=Exp_PhaseRetrieval(args, plot_animation)
 
     print(args.dset.name)
         
@@ -69,6 +72,7 @@ def run(args):
         test_set = utils_setup.get_test_set_for_sampling(args)
     else:
         test_set=None
+    print(test_set)
 
     if mode!="unconditional":
         for i, (original, filename) in enumerate(tqdm(test_set)):

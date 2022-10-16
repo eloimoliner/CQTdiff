@@ -3,7 +3,9 @@ import torch
 from src.sampler import SamplerPhaseRetrieval
 from src.experimenters.exp_base import Exp_Base
 import src.utils.bandwidth_extension as utils_bwe
+import src.utils.bandwidth_extension as utils_compsens
 import src.utils.logging as utils_logging
+import numpy as np
 
 class Exp_PhaseRetrieval(Exp_Base):
     def __init__(self, args, plot_animation):
@@ -27,14 +29,14 @@ class Exp_PhaseRetrieval(Exp_Base):
         """ 
         super().__init__(args)
         self.__plot_animation=plot_animation
-        self.sampler=SamplerInpainting(self.model, self.diff_parameters, self.args, args.inference.alpha, order=2, data_consistency=not(args.inference.no_replace), rid=self.__plot_animation)
+        self.sampler=SamplerPhaseRetrieval(self.model, self.diff_parameters, self.args, args.inference.xi, order=2, data_consistency=args.inference.data_consistency, rid=self.__plot_animation)
 
 
         self.__filter_final=utils_bwe.get_FIR_lowpass(100,10000,1,self.args.sample_rate)
         self.__filter_final=self.__filter_final.to(self.device)
 
         #clipping specific
-        n="spectrograms"+"_"+str(self.args.inference.phase_retrieval.win_size)
+        n="spec"+"_"+str(self.args.inference.phase_retrieval.win_size)
         self.path_degraded=os.path.join(self.path_sampling, n) #path for the clipped outputs
         #ensure the path exists
         if not os.path.exists(self.path_degraded):
@@ -51,14 +53,18 @@ class Exp_PhaseRetrieval(Exp_Base):
         if not os.path.exists(self.path_reconstructed):
             os.makedirs(self.path_reconstructed)
 
-        self.stft_args={
-                        "win_size":self.args.inference.phase_retrieval.win_size,
-                        "hop_size":self.args.inference.phase_retrieval.hop_size,
-                       }
+        
+        self.mask=torch.ones((1,self.args.audio_len)).to(self.device) #assume between 5 and 6s of total length
+        num_samples=int(self.args.audio_len*(100-self.args.inference.comp_sens.percentage)/100)
+        inds=np.random.choice(np.arange(args.audio_len),num_samples, replace=False) 
+        self.mask[...,inds]=0
 
-    def apply_stft(self,x, stft_args):
-        win_size=stft_args["win_size"]
-        hop_size=stft_args["hop_size"]
+
+    def apply_stft(self,x):
+
+        win_size=self.args.inference.phase_retrieval.win_size
+        hop_size=self.args.inference.phase_retrieval.hop_size
+
         window=torch.hamming_window(window_length=win_size).to(x.device)
         x2=torch.cat((x, torch.zeros(x.shape[0],win_size ).to(x.device)),-1)
         X=torch.stft(x2, win_size, hop_length=hop_size,window=window,center=False,return_complex=False)
@@ -73,21 +79,21 @@ class Exp_PhaseRetrieval(Exp_Base):
         audio_path=utils_logging.write_audio_file(seg, self.args.sample_rate, name, self.path_original+"/")
 
      
-            
-        #compute spectrogram
-        y=self.apply_stft(seg, self.stft_args)
+        #apply mask
+        y=self.apply_stft(seg)
 
-        utils_logging.plot_mag_spectrogram(y,refr=1, path=self.path_degraded, name=name)      
+        #save clipped audio file
+        audio_path=utils_logging.plot_mag_spectrogram(y, refr=1, name=name, path=self.path_degraded+"/")
 
         #input("stop")
         if self.__plot_animation:
-            x_hat, data_denoised, t=self.sampler.predict_pr(y,self.stft_args)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
+            x_hat, data_denoised, t=self.sampler.predict_pr(y)
+            fig=utils_logging.diffusion_CQT_animation(self.path_reconstructed,  data_denoised, t, self.args, name="animation"+name, resample_factor=3)
         else:
-            x_hat=self.sampler.predict_pr(y,self.stft_args)
+            x_hat=self.sampler.predict_pr(y)
            
         #apply low pass filter to remove annoying artifacts at the nyquist frequency. I should try to fix this issue in future work
-        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final) 
+        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
         audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")

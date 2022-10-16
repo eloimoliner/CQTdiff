@@ -1,9 +1,11 @@
+import os
 import torch 
 import time
 import numpy as np
 import cv2
 import torchaudio
 from collections import OrderedDict
+import glob
 
 from torch.utils.data import DataLoader
 
@@ -107,12 +109,21 @@ def worker_init_fn(worker_id):
  
 
 def get_test_set_for_sampling(args):
-    if args.inference.load.load_mode=="single_example":
-        assert args.inference.load.audio!=None
-        raise NotImplementedError
-    elif args.inference.load.load_mode=="from_directory":
+    if args.inference.load.load_mode=="from_directory":
+        """
+        loading the dataset from a directory, (NOT TESTED YET)
+        """
         assert args.inference.load.data_directory!=None
-        raise NotImplementedError
+        assert args.inference.load.seg_size!= None
+        assert args.inference.load.seg_idx!= None
+        files=glob.glob(os.path.join(args.inference.load.data_directory,"*.wav"))
+        assert len(files)>0
+        import src.dataset_loader as dataset
+        dataset_test=dataset.TestDataset_chunks_fromdir(files, args.sample_rate*args.resample_factor,args.audio_len*args.resample_factor, args.inference.load.seg_idx, return_name=True)
+        print(dataset_test)
+        test_set= DataLoader(dataset_test,num_workers=args.num_workers, shuffle=False, batch_size=1,  worker_init_fn=worker_init_fn)
+        return test_set
+
     elif args.inference.load.load_mode=="maestro_test":
         assert args.inference.load.seg_size!= None
         assert args.inference.load.seg_idx!= None
