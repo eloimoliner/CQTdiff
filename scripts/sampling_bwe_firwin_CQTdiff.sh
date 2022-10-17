@@ -22,7 +22,7 @@ exp_name="cqt"
 
 if [ "$exp_name" = "cqt" ]; then
 
-    ckpt="weights-319999.pt" 
+    ckpt="cqt_weights.pt" 
 fi 
 
 #n=1
