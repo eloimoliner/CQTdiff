@@ -62,4 +62,8 @@ class Exp_Unconditional(Exp_Base):
 
         #save reconstructed audio file
         audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        if self.__plot_animation:
+            return audio_path, fig
+        else:
+            return audio_path
         

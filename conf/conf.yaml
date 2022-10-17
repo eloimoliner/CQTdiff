@@ -50,7 +50,7 @@ cqt:
   numocts: 7  #important
   fmax: "nyq" # not used
   fmin: 150 #no worries, not used
-  use_norm: True
+  use_norm: False
 
 unet:
 ## Model params

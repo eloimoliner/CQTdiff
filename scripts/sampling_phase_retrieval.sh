@@ -37,27 +37,36 @@ echo $PATH_EXPERIMENT
 
 
 audio_len=65536
-#audio_len=131073
+#audio_len=131072
 #audio_len=262144
 #audio_len=1048576
 #audio_len=524288
 #audio_len=160531
 
 
-python sample.py  \
+python sample.py $iteration \
          model_dir="$PATH_EXPERIMENT" \
          architecture="unet_CQT" \
-         inference.mode="unconditional" \
-         inference.unconditional.num_samples=64 \
+         sample_rate=22050\
+         resample_factor=1 \
+         inference.mode="phase_retrieval" \
+         inference.load.load_mode="from_directory" \
+         inference.load.data_directory="/scratch/work/molinee2/projects/ddpm/CQTdiff/data_dir" \
+         inference.load.seg_size=$audio_len\
+         inference.load.seg_idx=0\
          inference.checkpoint=$ckpt \
+         inference.phase_retrieval.win_size=1024 \
+         inference.phase_retrieval.hop_size=256 \
          inference.T=70 \
          extra_info=$exp_name \
          inference.exp_name=$exp_name \
          diffusion_parameters.sigma_min=1e-4 \
          diffusion_parameters.sigma_max=1 \
          diffusion_parameters.ro=13\
-         diffusion_parameters.Schurn=10 \
+         diffusion_parameters.Schurn=5 \
+         inference.xi=0.3\
          audio_len=$audio_len\
+         inference.data_consistency=False\
          inference.max_thresh_grads=0
 
 

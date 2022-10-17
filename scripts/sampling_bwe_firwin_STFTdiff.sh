@@ -19,16 +19,21 @@ export CUDA_LAUNCH_BLOCKING=1
 
 #n=$SLURM_ARRAY_TASK_ID
 exp_name="cqt"
+exp_name="stft"
 
 if [ "$exp_name" = "cqt" ]; then
 
     ckpt="weights-319999.pt" 
 fi 
+if [ "$exp_name" = "stft" ]; then
 
-n=1
-namerun=sampling_bwe
-name="${n}_$namerun"
-iteration=`sed -n "${n} p" iteration_parameters.txt`
+    ckpt="weights-299999.pt" 
+fi 
+
+#n=1
+#namerun=sampling_bwe
+#name="${n}_$namerun"
+#iteration=`sed -n "${n} p" iteration_parameters.txt`
 #
 
 PATH_EXPERIMENT=experiments/$exp_name
@@ -43,9 +48,9 @@ audio_len=65536
 #audio_len=160531
 
 
-python sample.py $iteration \
+python sample.py \
          model_dir="$PATH_EXPERIMENT" \
-         architecture="unet_CQT" \
+         architecture="unet_STFT" \
          inference.mode="bandwidth_extension" \
          inference.load.load_mode="maestro_test" \
          inference.load.seg_size=$audio_len\
@@ -54,7 +59,6 @@ python sample.py $iteration \
          inference.bandwidth_extension.filter.type="firwin" \
          inference.bandwidth_extension.filter.order=500 \
          inference.bandwidth_extension.filter.fc=1000 \
-         inference.noise_in_observations=0.05
          inference.T=35 \
          extra_info=$exp_name \
          inference.exp_name=$exp_name \
@@ -62,9 +66,9 @@ python sample.py $iteration \
          diffusion_parameters.sigma_max=1 \
          diffusion_parameters.ro=13\
          diffusion_parameters.Schurn=5 \
-         inference.xi=0.2\
+         inference.xi=0.1\
          audio_len=$audio_len\
-         inference.data_consistency=False\
+         inference.data_consistency=True\
 
 
 

@@ -49,8 +49,18 @@ def run(args):
     train_set = iter(train_loader)
         
     #prepare the model architecture
-    from src.model import Unet_CQT
-    model=Unet_CQT(args, device).to(device)
+    
+    if self.args.architecture=="unet_CQT":
+        from src.models.unet_cqt import Unet_CQT
+        model=Unet_CQT(args, device).to(device)
+    elif self.args.architecture=="unet_STFT":
+        from src.models.unet_stft import Unet_STFT
+        self.model=Unet_STFT(self.args, self.device).to(self.device)
+    elif self.args.architecture=="unet_1d":
+        from src.models.unet_1d import Unet_1d
+        self.model=Unet_1d(self.args, self.device).to(self.device)
+    else:
+        raise NotImplementedError
 
     #prepare the optimizer
 

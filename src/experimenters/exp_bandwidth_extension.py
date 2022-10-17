@@ -88,9 +88,9 @@ class Exp_BWE(Exp_Base):
 
         #save clipped audio file
         if self.args.inference.bandwidth_extension.filter.type=="resample" or self.args.inference.bandwidth_extension.filter.type=="decimate":
-            audio_path=utils_logging.write_audio_file(y, self.args.inference.bandwidth_extension.filter.resample.fs, name, self.path_degraded+"/")
+            path_degraded=utils_logging.write_audio_file(y, self.args.inference.bandwidth_extension.filter.resample.fs, name, self.path_degraded+"/")
         else:
-            audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
+            path_degraded=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
 
         #input("stop")
         if self.__plot_animation:
@@ -103,5 +103,9 @@ class Exp_BWE(Exp_Base):
         x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
-        audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        path_result=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
         
+        if self.__plot_animation:
+            return path_degraded, path_result, fig
+        else:
+            return path_degraded, path_result
