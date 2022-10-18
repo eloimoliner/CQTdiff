@@ -14,7 +14,11 @@ import plotly
 import scipy.signal as sig
 
 from src.CQT_nsgt import CQT_cpx
+
 def do_stft(noisy, clean=None, win_size=2048, hop_size=512, device="cpu", DC=True):
+    """
+        applies the stft, this an ugly old function, but I'm using it for logging and I'm to lazy to modify it
+    """
     
     #window_fn = tf.signal.hamming_window
 
@@ -363,6 +367,9 @@ def downsample2d(inputArray, kernelSize):
 
 
 def diffusion_CQT_animation(path, x ,t,  args, refr=1, name="animation_diffusion", resample_factor=1 ):
+    """
+        Utility for creating an animation of the cqt diffusion process
+    """
     #shape of input spectrograms:  (Nsteps,B,Time,Freq)
     #print(noisy.shape)
     Nsteps=x.shape[0]
@@ -494,6 +501,8 @@ def generate_images_from_cpxspec(CQTmat):
         else:
              res=np.concatenate((res,o), axis=0)
     return res
+
+
 def generate_images_from_cqt(CQTmat):
     CQTmat=CQTmat.permute(0,3,2,1)
     
@@ -509,26 +518,3 @@ def generate_images_from_cqt(CQTmat):
         else:
              res=np.concatenate((res,o), axis=0)
     return res
-#def generate_images_cqt(audio, CQTransform):
-#    audio=audio.unsqueeze(0)
-#    cpx=CQTransform.fwd(audio)
-#    cpx=cpx.permute(0,3,2,1)
-#    cpx=cpx.cpu().detach().numpy()
-#    spectro=np.clip((np.flipud(np.transpose(10*np.log10(np.sqrt(np.power(cpx[...,0],2)+np.power(cpx[...,1],2)))))+30)/50,0,1)
-#    cmap=cv2.COLORMAP_JET
-#    spectro = np.array((1-spectro)* 255, dtype = np.uint8)
-#    spectro = cv2.applyColorMap(spectro, cmap)
-#    return np.flipud(np.fliplr(spectro))
-
-def apply_nlds(x):
-    #H=[0, 1.4847, 0, -1.4449, 0, 2.4713, 0, -2.4234, 0, 0.9158, 0];  #FEXP!  Analytical and Perceptual Evaluation of Nonlinear Devices for Virtual Bass System, Nay Oo , and Woon-Seng Gan
-    #x1=torch.zeros_like(x)
-    #for n in range(1,len(H)):
-    #    x1=x1+H[n]*x**(n)
-    #HWR, RELU is the same
-
-    x1=torch.nn.functional.tanh(x)
-    x2=torch.nn.functional.relu(x)
-    
-
-    return torch.stack((x1,x2), dim=1)

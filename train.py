@@ -16,8 +16,7 @@ def run(args):
     """Loads all the modules and starts the training
         
     Args:
-      args:
-        Hydra dictionary
+      args:        Hydra dictionary
 
     """
         

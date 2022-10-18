@@ -2,6 +2,12 @@ import numpy as np
 from scipy.optimize import fsolve
 
 def get_clip_value_from_SDR(seg, SDRdesired):
+    """
+        This function finds the corresponding clipping threshold for a given SDR
+        Args:
+           seg (Tensor): shape (T,) audio segment we want to clip
+           SDRdesired (float) : Signal-to-Distortion Rateio (SDR) value
+    """
 
     def find_clip_value(thresh, x, SDRtarget):
         xclipped=np.clip(x, -thresh, thresh)

@@ -356,6 +356,9 @@ class SamplerBWE(Sampler):
         if filt_type=="firwin":
             self.filt=filt.to(ylpf.device)
             degradation=lambda x: self.apply_FIR_filter(x)
+        if filt_type=="firwin_hpf":
+            self.filt=filt.to(ylpf.device)
+            degradation=lambda x: self.apply_FIR_filter(x)
         elif filt_type=="cheby1":
             b,a=filt
             self.a=torch.Tensor(a).to(ylpf.device)

@@ -39,6 +39,9 @@ class Exp_BWE(Exp_Base):
         if self.args.inference.bandwidth_extension.filter.type=="firwin":
             beta=self.args.inference.bandwidth_extension.filter.beta
             self.filter=utils_bwe.get_FIR_lowpass(order,fc, beta,self.args.sample_rate)
+        elif self.args.inference.bandwidth_extension.filter.type=="firwin_hpf":
+            beta=self.args.inference.bandwidth_extension.filter.beta
+            self.filter=utils_bwe.get_FIR_high_pass(order,fc, beta,self.args.sample_rate)
         elif self.args.inference.bandwidth_extension.filter.type=="cheby1":
             ripple =self.args.inference.bandwidth_extension.filter.ripple
             b,a=utils_bwe.get_cheby1_ba(order, ripple, 2*fc/self.args.sample_rate) 
