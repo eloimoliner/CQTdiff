@@ -19,7 +19,7 @@ from src.sde import  VE_Sde_Elucidating
 
 class Learner:
     def __init__(
-        self, model_dir, model, train_set,  optimizer, args, log=True
+        self, model_dir, model, train_set,  args, log=True
     ):
         """
         Args:
