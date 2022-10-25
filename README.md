@@ -9,7 +9,7 @@ Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/i
 ## Abstract
 TODO
 
-Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/icassp23-cqt-diff/)
+
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
 
