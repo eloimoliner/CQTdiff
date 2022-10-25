@@ -69,7 +69,7 @@ class Exp_Declipping(Exp_Base):
         y=torch.clip(seg,min=-clip_value, max=clip_value)
 
         #save clipped audio file
-        audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
+        audio_path_clipped=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
         print(audio_path)
 
         #input("stop")
@@ -83,6 +83,10 @@ class Exp_Declipping(Exp_Base):
         x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin")
 
         #save reconstructed audio file
-        audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        audio_path_result=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
         print(audio_path)
+        if self.__plot_animation:
+            return audio_path_clipped, audio_path_result, fig
+        else:
+            return audio_path_clipped, audio_path_result
         
