@@ -58,7 +58,7 @@ class Exp_Unconditional(Exp_Base):
             x_hat=self.sampler.predict_unconditional(shape,self.device)
            
         #apply low pass filter to remove annoying artifacts at the nyquist frequency. I should try to fix this issue in future work
-        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final) 
+        x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
         audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
