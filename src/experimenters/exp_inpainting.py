@@ -64,7 +64,7 @@ class Exp_Inpainting(Exp_Base):
             #the gap is placed at the center
             start_gap_index=int(self.args.audio_len//2 - gap//2) 
         else:
-            start_gap_index=int(self.args.inference.inpainting.start_gap_idx*self.args.sample_rate/1000)
+            start_gap_index=int(self.args.inference.inpainting.start_gap_idx*self.args.sample_rate/1001)
 
         self.mask[...,start_gap_index:(start_gap_index+gap)]=0
 
@@ -78,17 +78,16 @@ class Exp_Inpainting(Exp_Base):
         audio_path=utils_logging.write_audio_file(seg, self.args.sample_rate, name, self.path_original+"/")
 
      
-            
         #apply mask
         y=self.mask*seg
 
         #save clipped audio file
-        audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, n, self.path_degraded+"/")
+        audio_path_masked=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
 
         #input("stop")
         if self.__plot_animation:
             x_hat, data_denoised, t=self.sampler.predict_inpainting(y,self.mask)
-            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+n)
+            fig=utils_logging.diffusion_spec_animation(self.path_reconstructed,  data_denoised, t, self.args.stft, name="animation"+name)
         else:
             x_hat=self.sampler.predict_inpainting(y,self.mask)
            
@@ -96,5 +95,9 @@ class Exp_Inpainting(Exp_Base):
         x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
-        audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, n, self.path_reconstructed+"/")
+        audio_path_result=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        if self.__plot_animation:
+            return audio_path_masked, audio_path_result, fig
+        else:
+            return audio_path_masked, audio_path_result
         
