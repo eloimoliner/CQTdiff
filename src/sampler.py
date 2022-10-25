@@ -308,6 +308,7 @@ class SamplerInpainting(Sampler):
         return self.mask*x
 
     def predict_inpainting(
+        self,
         y_masked,
         mask
         ):
