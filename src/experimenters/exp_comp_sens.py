@@ -73,7 +73,7 @@ class Exp_CompSens(Exp_Base):
         y=self.mask*seg
 
         #save clipped audio file
-        audio_path=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
+        audio_path_masked=utils_logging.write_audio_file(y, self.args.sample_rate, name, self.path_degraded+"/")
 
         #input("stop")
         if self.__plot_animation:
@@ -86,5 +86,9 @@ class Exp_CompSens(Exp_Base):
         x_hat=utils_bwe.apply_low_pass(x_hat, self.__filter_final, "firwin") 
 
         #save reconstructed audio file
-        audio_path=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        audio_path_result=utils_logging.write_audio_file(x_hat, self.args.sample_rate, name, self.path_reconstructed+"/")
+        if self.__plot_animation:
+            return audio_path_masked, audio_path_result, fig
+        else:
+            return audio_path_masked, audio_path_result
         
