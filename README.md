@@ -4,6 +4,8 @@ Official repository of the paper:
 
 > E. Moliner, V. Välimäki and J. Lehtinen, "Solving audio inverse problems with a diffusion model", submitted to IEEE International Conference on Acoustics, Speech, and Signal Processing (ICASSP), Rodes, Greece May, 2023
 
+
+Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/icassp23-cqt-diff/)
 ## Abstract
 TODO
 
