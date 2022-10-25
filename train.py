@@ -16,7 +16,8 @@ def run(args):
     """Loads all the modules and starts the training
         
     Args:
-      args:        Hydra dictionary
+      args:
+        Hydra dictionary
 
     """
         
@@ -56,7 +57,7 @@ def run(args):
         from src.models.unet_stft import Unet_STFT
         self.model=Unet_STFT(self.args, self.device).to(self.device)
     elif self.args.architecture=="unet_1d":
-        from src.models.unet_1d import Unet_1d
+        from src.models.unet_1d import Unet_2d
         self.model=Unet_1d(self.args, self.device).to(self.device)
     else:
         raise NotImplementedError
