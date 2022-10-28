@@ -50,13 +50,13 @@ def run(args):
         
     #prepare the model architecture
     
-    if self.args.architecture=="unet_CQT":
+    if args.architecture=="unet_CQT":
         from src.models.unet_cqt import Unet_CQT
         model=Unet_CQT(args, device).to(device)
-    elif self.args.architecture=="unet_STFT":
+    elif args.architecture=="unet_STFT":
         from src.models.unet_stft import Unet_STFT
         self.model=Unet_STFT(self.args, self.device).to(self.device)
-    elif self.args.architecture=="unet_1d":
+    elif args.architecture=="unet_1d":
         from src.models.unet_1d import Unet_2d
         self.model=Unet_1d(self.args, self.device).to(self.device)
     else:
@@ -67,7 +67,7 @@ def run(args):
     from src.learner import Learner
     
     learner = Learner(
-        args.model_dir, model, train_set,  args, log=True
+        args.model_dir, model, train_set,  args, log=args.log
     )
 
     #start the training

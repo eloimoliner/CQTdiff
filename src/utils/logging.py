@@ -2,10 +2,8 @@ import os
 import torch 
 import time
 import numpy as np
-import cv2
 import torchaudio
 import src.utils as utils
-import matplotlib.pyplot as plt
 import plotly.express as px
 import soundfile as sf
 import plotly.graph_objects as go
@@ -484,37 +482,5 @@ def plot_spectrogram_from_cpxspec(X, refr=None):
     #shape of input spectrogram:  (     ,T,F, )
     return plot_spectrogram(X, refr)
 
-def generate_images_from_cpxspec(CQTmat):
-    CQTmat=CQTmat.squeeze(1)
-    CQTmat=CQTmat.permute(0,2,1,3)
-    
-    for i in range(CQTmat.shape[0]):
-        cpx=CQTmat[i].cpu().detach().numpy()
-        spectro=np.clip((np.flipud(np.transpose(10*np.log10(np.sqrt(np.power(cpx[...,0],2)+np.power(cpx[...,1],2)))))+30)/50,0,1)
-        cmap=cv2.COLORMAP_JET
-        spectro = np.array((1-spectro)* 255, dtype = np.uint8)
-        spectro = cv2.applyColorMap(spectro, cmap)
-        #print(spectro.shape)
-        o= np.flipud(np.fliplr(spectro))
-        if i==0:
-             res=o
-        else:
-             res=np.concatenate((res,o), axis=0)
-    return res
 
 
-def generate_images_from_cqt(CQTmat):
-    CQTmat=CQTmat.permute(0,3,2,1)
-    
-    for i in range(CQTmat.shape[0]):
-        cpx=CQTmat[i].cpu().detach().numpy()
-        spectro=np.clip((np.flipud(np.transpose(10*np.log10(np.sqrt(np.power(cpx[...,0],2)+np.power(cpx[...,1],2)))))+30)/50,0,1)
-        cmap=cv2.COLORMAP_JET
-        spectro = np.array((1-spectro)* 255, dtype = np.uint8)
-        spectro = cv2.applyColorMap(spectro, cmap)
-        o= np.flipud(np.fliplr(spectro))
-        if i==0:
-             res=o
-        else:
-             res=np.concatenate((res,o), axis=0)
-    return res

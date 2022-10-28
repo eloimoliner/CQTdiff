@@ -14,17 +14,35 @@ TODO
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
 
 ## Requirements
-TODO
+Python 3.8
 
-## Try it
-
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
+pip install -r requirements.txt
 
 
 ## Training
 To retrain the model, follow the instructions:
 
-TODO
+mkdir experiments/my_experiment
+python train.py  model_dir="experiments/my_experiment"
+
+To change the configuration, override the hydra parameters from conf/conf.yaml
+
+By default, the training scripts logs to wandb. Set log=False if this is not desired
+
+python train.py log=False
+
+## Testing
+
+Some of the experiments are implemented in the Colab notebook [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb). 
+
+bash scripts/....sh
+
+python sample.py \
+        inference.load.load_mode="from_directory" \
+        inference.load.data_directory="$path_to_audio_files" \
+        inference.mode=$test_mode
+
+the variable $test_mode selects the type of experiments. Examples are: "bandwidth_extension", "inpainting" or "declipping"
 
 ## Remarks
 

@@ -88,8 +88,9 @@ restore : False
 checkpoint_id: None
 
 #logging params
-log_interval: 10
-save_interval: 100
+log: True
+log_interval: 1000
+save_interval: 10000
 #
 #Monitoring  (number of windows for plotting loss dependent on sigma)
 n_bins: 20

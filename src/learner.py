@@ -48,7 +48,7 @@ class Learner:
             raise NotImplementedError
 
         self.args = args
-        self.sampler=Sampler(self.model,self.diff_parameters, self.args, alpha=self.args.inference.alpha, data_consistency=self.args.inference.data_consistency, rid=False) #am I misising parameters
+        self.sampler=Sampler(self.model,self.diff_parameters, self.args, xi=self.args.inference.xi, data_consistency=self.args.inference.data_consistency, rid=False) #am I misising parameters
 
         self.ema_rate = args.ema_rate
         self.train_set = train_set
