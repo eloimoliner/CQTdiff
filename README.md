@@ -29,7 +29,7 @@ python train.py  model_dir="experiments/my_experiment"
 
 To change the configuration, override the hydra parameters (listed in `conf/conf.yaml`)
 
-By default, the training scripts logs to wandb. Set `log=False` if this is not desired.
+By default, the training scripts log to wandb. Set `log=False` if this is not desired.
 ```bash
 python train.py log=False
 ```
@@ -45,7 +45,7 @@ python sample.py \
         inference.load.data_directory="$path_to_audio_files" \
         inference.mode=$test_mode
 ```
-The variable  `$test_mode` selects the type of experiments. Examples are: "bandwidth_extension", "inpainting" or "declipping". There are many others parameters to select listed in the inference section from `conf/conf.yaml`. Some experiment examples are located in the directory `scripts/`.
+The variable `$test_mode` selects the type of experiments. Examples are: "bandwidth_extension", "inpainting" or "declipping". There are many other parameters to select listed in the inference section from `conf/conf.yaml`. Some experiment examples are located in the directory `scripts/`.
 
 ## Remarks
 
