@@ -6,54 +6,46 @@ Official repository of the paper:
 
 
 Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/icassp23-cqt-diff/)
-## Abstract
-TODO
-
 
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
 
 ## Requirements
-Python 3.8
+This repository requires Python 3.8+ and Pytorch 1.10+. Other packages are listed in requirements.txt.
 
+To install the requirements in your environment:
 ```bash
 pip install -r requirements.txt
 ```
 
-
 ## Training
-To retrain the model, follow the instructions:
+To retrain the model, run:
 
 ```bash
 mkdir experiments/my_experiment
 python train.py  model_dir="experiments/my_experiment"
 ```
 
+To change the configuration, override the hydra parameters (listed in conf/conf.yaml)
 
-To change the configuration, override the hydra parameters from conf/conf.yaml
-
-By default, the training scripts logs to wandb. Set log=False if this is not desired
-
+By default, the training scripts logs to wandb. Set log=False if this is not desired.
 ```bash
 python train.py log=False
 ```
 
 ## Testing
 
-Some of the experiments are implemented in the Colab notebook [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb). 
+To wuickly test our method, we recomment running the [![Colab Notebook](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb), where some of the experiments are implemented.
 
-
+To run it locally, use:
 ```bash
 python sample.py \
         inference.load.load_mode="from_directory" \
         inference.load.data_directory="$path_to_audio_files" \
         inference.mode=$test_mode
 ```
-
-the variable $test_mode selects the type of experiments. Examples are: "bandwidth_extension", "inpainting" or "declipping"
-
-Some experiment examples are located in the directort scripts/
+The variable $test_mode selects the type of experiments. Examples are: "bandwidth_extension", "inpainting" or "declipping". There are many others parameters to select listed in the inference section from conf/conf.yaml. Some experiment examples are located in the directort scripts/
 
 ## Remarks
 
-The model is trained using the MAESTRO dataset, the performance is expected to decrease in out-of-distribution data
+The model is trained using the MAESTRO dataset, the performance is expected to decrease in out-of-distribution data.
