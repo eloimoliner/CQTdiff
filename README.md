@@ -11,14 +11,17 @@ Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/i
 
 [![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
 
-## Requirements
+## Setup
 This repository requires Python 3.8+ and Pytorch 1.10+. Other packages are listed in `requirements.txt`.
 
 To install the requirements in your environment:
 ```bash
 pip install -r requirements.txt
 ```
-
+To install the pre-trained weights and download a set of audio samples from the MAESTRO test set, run:
+```bash
+bash download_weights_and_examples.sh
+```
 ## Training
 To retrain the model, run:
 
