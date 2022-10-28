@@ -36,7 +36,7 @@ python train.py log=False
 
 ## Testing
 
-To wuickly test our method, we recomment running the [![Colab Notebook](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb), where some of the experiments are implemented.
+To easily test our method, we recomment running the [Colab Notebook](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb), where some of the experiments are implemented.
 
 To run it locally, use:
 ```bash
