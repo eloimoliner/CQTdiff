@@ -9,7 +9,7 @@ Read the paper in [arXiv](https://arxiv.org/abs/2210.15228)
 Listen to our [audio samples](http://research.spa.aalto.fi/publications/papers/icassp23-cqt-diff/)
 
 
-[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebooks/demo.ipynb)
 
 ## Setup
 This repository requires Python 3.8+ and Pytorch 1.10+. Other packages are listed in `requirements.txt`.
@@ -39,7 +39,7 @@ python train.py log=False
 
 ## Testing
 
-To easily test our method, we recomment running the [Colab Notebook](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebook/demo.ipynb), where some of the experiments are implemented.
+To easily test our method, we recomment running the [Colab Notebook](https://colab.research.google.com/github/eloimoliner/CQTdiff/blob/main/notebooks/demo.ipynb), where some of the experiments are implemented.
 
 To run it locally, use:
 ```bash
