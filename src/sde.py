@@ -36,7 +36,7 @@ class VE_Sde_Elucidating():
             t (Tensor): shape: (N_steps, ) Tensor of timesteps, from which we will compute gamma
         """
         N=t.shape[0]
-        gamma=torch.zeros(t.shape)
+        gamma=torch.zeros(t.shape, device=t.device)
         
         #If desired, only apply stochasticity between a certain range of noises Stmin is 0 by default and Stmax is a huge number by default. (Unless these parameters are specified, this does nothing)
         indexes=torch.logical_and(t>self.Stmin , t<self.Stmax)
